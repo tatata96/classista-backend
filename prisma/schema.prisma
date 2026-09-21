@@ -35,7 +35,6 @@ enum RecurrenceType {
 enum ClassPlanStatus {
   ACTIVE
   PAUSED
-  CANCELLED
 }
 
 // ==========================================
@@ -54,6 +53,12 @@ model User {
   // One user can have many partner memberships.
   memberships PartnerMembership[]
 
+  // One user can make many bookings as a customer.
+  bookings      Booking[]
+  // One user can perform many booking actions (e.g., cancel or check in).
+  // The relation name connects this field to BookingEvent.actor.
+  bookingEvents BookingEvent[] @relation("BookingEventActor")
+
   // DATABASE COLUMNS
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -63,10 +68,17 @@ model User {
 // PARTNER
 // ==========================================
 
+enum PartnerStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model Partner {
   // DATABASE COLUMNS
-  id   String @id @default(uuid()) @db.Uuid
-  name String
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  status      PartnerStatus @default(ACTIVE)
 
   // PRISMA RELATIONS (not database columns)
   // One partner can have many of each.
@@ -295,13 +307,91 @@ model ClassSession {
   venue      Venue       @relation(fields: [venueId], references: [id])
   instructor Instructor? @relation(fields: [instructorId], references: [id])
 
+  // One session can have many customer bookings.
+  bookings Booking[]
+
   // DATABASE COLUMNS
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // DATABASE CONSTRAINT
+  // Prevent duplicate sessions for the same plan and start time.
+  @@unique([classPlanId, startAt])
   // DATABASE INDEXES
-  @@index([classPlanId])
   @@index([venueId])
   @@index([instructorId])
   @@index([startAt])
+}
+
+// ==========================================
+// BOOKING
+// ==========================================
+
+enum BookingStatus {
+  BOOKED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+  LATE_CANCELLED
+  CANCELLED_BY_PARTNER
+  REMOVED
+}
+
+model Booking {
+  // DATABASE COLUMNS
+  id         String        @id @default(uuid()) @db.Uuid
+  sessionId  String        @db.Uuid
+  customerId String        @db.Uuid
+  status     BookingStatus @default(BOOKED)
+
+  bookedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  cancelledAt DateTime? @db.Timestamptz(3)
+
+  // PRISMA RELATIONS (not database columns)
+  session  ClassSession @relation(fields: [sessionId], references: [id])
+  customer User         @relation(fields: [customerId], references: [id])
+
+  events BookingEvent[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  // DATABASE INDEXES
+  @@index([sessionId])
+  @@index([customerId])
+}
+
+// ==========================================
+// BOOKING EVENT
+// ==========================================
+
+enum BookingEventAction {
+  CREATED
+  CANCELLED
+  REMOVED
+  CHECKED_IN
+  NO_SHOW
+}
+
+model BookingEvent {
+  // DATABASE COLUMNS
+  id        String             @id @default(uuid()) @db.Uuid
+  bookingId String             @db.Uuid
+  action    BookingEventAction
+  actorId   String?            @db.Uuid
+
+  reason String?
+  notes  String?
+
+  // PRISMA RELATIONS (not database columns)
+  booking Booking @relation(fields: [bookingId], references: [id])
+  actor   User?   @relation("BookingEventActor", fields: [actorId], references: [id])
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  // DATABASE INDEXES
+  @@index([bookingId])
+  @@index([actorId])
 }
