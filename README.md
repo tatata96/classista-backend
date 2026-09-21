@@ -85,34 +85,6 @@ test/
   app.e2e-spec.ts         End-to-end test suite
 ```
 
-## Prisma Schema Notes
-
-Quick reminders from building the first database schema:
-
-- **`@` = field-level attribute.** For example, `@id` marks a primary key and `@unique` makes one field unique.
-- **`@@` = model-level attribute.** Use `@@unique([userId, partnerId])` when a *combination* must be unique. Use `@@index([partnerId])` to create an index that can speed up lookups; it **does not prevent duplicates**. `@@index` uses two `@` symbols even for a single field.
-- **Foreign key vs. relation field:** `classTypeId` is a real column in `ClassPlan`. `classType ClassType @relation(fields: [classTypeId], references: [id])` describes how that column references `ClassType.id` and lets Prisma access the related record.
-- **Reverse relation:** `classPlans ClassPlan[]` in `ClassType` tells Prisma that one class type has many plans. Neither `classType` nor `classPlans` creates an extra database column; the foreign key is `ClassPlan.classTypeId`.
-
-```prisma
-model PartnerMembership {
-  userId    String @db.Uuid
-  partnerId String @db.Uuid
-
-  @@unique([userId, partnerId]) // A user can join a given partner only once.
-}
-
-model ClassSession {
-  classPlanId String   @db.Uuid
-  startAt     DateTime @db.Timestamptz(3)
-
-  @@unique([classPlanId, startAt]) // No duplicate session at the same time for one plan.
-  @@index([startAt])              // Speeds up queries by session start time.
-}
-```
-
-These snippets highlight attributes only; see `prisma/schema.prisma` for the complete models and relations.
-
 ## Roadmap
 
 - Database configuration
