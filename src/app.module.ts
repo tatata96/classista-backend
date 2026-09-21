@@ -3,6 +3,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './lib/database/prisma.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
 
 @Module({
   imports: [
@@ -10,6 +11,7 @@ import { PrismaModule } from './lib/database/prisma.module.js';
       isGlobal: true,
     }),
     PrismaModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

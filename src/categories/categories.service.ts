@@ -1,0 +1,35 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../lib/database/prisma.service.js';
+
+@Injectable()
+export class CategoriesService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  findAll() {
+    return this.prisma.category.findMany({
+      where: {
+        parentId: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        children: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  }
+}
