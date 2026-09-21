@@ -1,5 +1,7 @@
 notes
 
+*.tsbuildinfo
+
 # compiled output
 /dist
 /node_modules
