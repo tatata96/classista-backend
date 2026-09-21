@@ -1,9 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const configService = app.get(ConfigService);
+
+  app.enableCors({
+    origin: configService.get<string>('CORS_ORIGIN'),
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Classista API')
@@ -15,7 +22,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('api/docs', app, documentFactory);
 
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  await app.listen(configService.get<string>('PORT') ?? 3000, '0.0.0.0');
 }
 
 await bootstrap();
