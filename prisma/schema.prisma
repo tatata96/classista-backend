@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,404 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ==========================================
+// ENUMS
+// Define allowed values. Not database tables.
+// ==========================================
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum PartnerRole {
+  OWNER
+  STAFF
+}
+
+enum VenueStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum RecurrenceType {
+  RECURRING
+  ONE_TIME
+}
+
+enum ClassPlanStatus {
+  ACTIVE
+  PAUSED
+}
+
+// ==========================================
+// USER
+// ==========================================
+
+model User {
+  // DATABASE COLUMNS
+  id    String   @id @default(uuid()) @db.Uuid
+  name  String
+  email String?  @unique
+  phone String?  @unique
+  role  UserRole @default(CUSTOMER)
+
+  // PRISMA RELATIONS (not database columns)
+  // One user can have many partner memberships.
+  memberships PartnerMembership[]
+
+  // One user can make many bookings as a customer.
+  bookings      Booking[]
+  // One user can perform many booking actions (e.g., cancel or check in).
+  // The relation name connects this field to BookingEvent.actor.
+  bookingEvents BookingEvent[] @relation("BookingEventActor")
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// PARTNER
+// ==========================================
+
+enum PartnerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Partner {
+  // DATABASE COLUMNS
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  status      PartnerStatus @default(ACTIVE)
+
+  // PRISMA RELATIONS (not database columns)
+  // One partner can have many of each.
+  memberships PartnerMembership[]
+  venues      Venue[]
+  instructors Instructor[]
+  classTypes  ClassType[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// PARTNER MEMBERSHIP
+// Connects users and partners.
+// ==========================================
+
+model PartnerMembership {
+  // DATABASE COLUMNS
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
+  partnerId String      @db.Uuid
+  role      PartnerRole
+
+  // PRISMA RELATIONS (not database columns)
+  // userId and partnerId are the actual foreign keys.
+  user    User    @relation(fields: [userId], references: [id])
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // DATABASE CONSTRAINT
+  // Prevent duplicate memberships for the same user and partner.
+  @@unique([userId, partnerId])
+}
+
+// ==========================================
+// VENUE
+// ==========================================
+
+model Venue {
+  // DATABASE COLUMNS
+  id        String      @id @default(uuid()) @db.Uuid
+  partnerId String      @db.Uuid
+  name      String
+  status    VenueStatus @default(ACTIVE)
+
+  addressLine String
+  district    String
+  city        String
+  postalCode  String?
+  latitude    Float?
+  longitude   Float?
+  phone       String?
+  timezone    String
+  amenityIds  String[] @default([])
+
+  // PRISMA RELATIONS (not database columns)
+  // partnerId is the actual foreign key.
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  // One venue can have many class plans.
+  classPlans    ClassPlan[]
+  classSessions ClassSession[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // DATABASE INDEX
+  @@index([partnerId])
+}
+
+// ==========================================
+// CATEGORY
+// ==========================================
+
+model Category {
+  // DATABASE COLUMNS
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  parentId    String? @db.Uuid
+
+  // PRISMA RELATIONS (not database columns)
+
+  // A category can belong to another category.
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  // A category can have many subcategories.
+  children Category[] @relation("CategoryHierarchy")
+
+  // One category can have many class types.
+  classTypes ClassType[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // DATABASE INDEX
+  @@index([parentId])
+}
+
+// ==========================================
+// CLASS TYPE
+// ==========================================
+
+model ClassType {
+  // DATABASE COLUMNS
+  id          String  @id @default(uuid()) @db.Uuid
+  partnerId   String  @db.Uuid
+  categoryId  String  @db.Uuid
+  name        String
+  description String?
+  imageUrl    String?
+  isActive    Boolean @default(true)
+
+  // PRISMA RELATIONS (not database columns)
+  // partnerId and categoryId are the actual foreign keys.
+  partner  Partner  @relation(fields: [partnerId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  // One class type can have many class plans.
+  classPlans ClassPlan[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // DATABASE INDEXES
+  @@index([partnerId])
+  @@index([categoryId])
+}
+
+// ==========================================
+// INSTRUCTOR
+// ==========================================
+
+model Instructor {
+  // DATABASE COLUMNS
+  id        String  @id @default(uuid()) @db.Uuid
+  partnerId String  @db.Uuid
+  name      String
+  bio       String?
+  imageUrl  String?
+  isActive  Boolean @default(true)
+
+  // PRISMA RELATIONS (not database columns)
+  // partnerId is the actual foreign key.
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  // One instructor can teach many class plans.
+  classPlans    ClassPlan[]
+  classSessions ClassSession[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // DATABASE INDEX
+  @@index([partnerId])
+}
+
+// ==========================================
+// CLASS PLAN
+// ==========================================
+
+model ClassPlan {
+  // DATABASE COLUMNS
+  id           String  @id @default(uuid()) @db.Uuid
+  classTypeId  String  @db.Uuid
+  venueId      String  @db.Uuid
+  instructorId String? @db.Uuid
+
+  title       String
+  description String?
+
+  startDate      DateTime       @db.Date
+  endDate        DateTime?      @db.Date
+  recurrenceType RecurrenceType
+  weekdays       Int[]
+
+  startTime DateTime @db.Time(0)
+  endTime   DateTime @db.Time(0)
+
+  capacity Int
+  status   ClassPlanStatus @default(ACTIVE)
+
+  // PRISMA RELATIONS (not database columns)
+  // The three IDs above are the actual foreign keys.
+  classType  ClassType   @relation(fields: [classTypeId], references: [id])
+  venue      Venue       @relation(fields: [venueId], references: [id])
+  instructor Instructor? @relation(fields: [instructorId], references: [id])
+
+  // One class plan can have many class sessions.
+  classSessions ClassSession[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // DATABASE INDEXES
+  @@index([classTypeId])
+  @@index([venueId])
+  @@index([instructorId])
+}
+
+// ==========================================
+// CLASS SESSION
+// ==========================================
+
+enum SessionStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+model ClassSession {
+  // DATABASE COLUMNS
+  id           String  @id @default(uuid()) @db.Uuid
+  classPlanId  String  @db.Uuid
+  venueId      String  @db.Uuid
+  instructorId String? @db.Uuid
+
+  startAt DateTime @db.Timestamptz(3)
+  endAt   DateTime @db.Timestamptz(3)
+
+  capacity        Int
+  status          SessionStatus @default(SCHEDULED)
+  cancelledReason String?
+
+  // PRISMA RELATIONS (not database columns)
+  classPlan  ClassPlan   @relation(fields: [classPlanId], references: [id])
+  venue      Venue       @relation(fields: [venueId], references: [id])
+  instructor Instructor? @relation(fields: [instructorId], references: [id])
+
+  // One session can have many customer bookings.
+  bookings Booking[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // DATABASE CONSTRAINT
+  // Prevent duplicate sessions for the same plan and start time.
+  @@unique([classPlanId, startAt])
+  // DATABASE INDEXES
+  @@index([venueId])
+  @@index([instructorId])
+  @@index([startAt])
+}
+
+// ==========================================
+// BOOKING
+// ==========================================
+
+enum BookingStatus {
+  BOOKED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+  LATE_CANCELLED
+  CANCELLED_BY_PARTNER
+  REMOVED
+}
+
+model Booking {
+  // DATABASE COLUMNS
+  id         String        @id @default(uuid()) @db.Uuid
+  sessionId  String        @db.Uuid
+  customerId String        @db.Uuid
+  status     BookingStatus @default(BOOKED)
+
+  bookedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  cancelledAt DateTime? @db.Timestamptz(3)
+
+  // PRISMA RELATIONS (not database columns)
+  session  ClassSession @relation(fields: [sessionId], references: [id])
+  customer User         @relation(fields: [customerId], references: [id])
+
+  events BookingEvent[]
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  // DATABASE INDEXES
+  @@index([sessionId])
+  @@index([customerId])
+}
+
+// ==========================================
+// BOOKING EVENT
+// ==========================================
+
+enum BookingEventAction {
+  CREATED
+  CANCELLED
+  REMOVED
+  CHECKED_IN
+  NO_SHOW
+}
+
+model BookingEvent {
+  // DATABASE COLUMNS
+  id        String             @id @default(uuid()) @db.Uuid
+  bookingId String             @db.Uuid
+  action    BookingEventAction
+  actorId   String?            @db.Uuid
+
+  reason String?
+  notes  String?
+
+  // PRISMA RELATIONS (not database columns)
+  booking Booking @relation(fields: [bookingId], references: [id])
+  actor   User?   @relation("BookingEventActor", fields: [actorId], references: [id])
+
+  // DATABASE COLUMNS
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  // DATABASE INDEXES
+  @@index([bookingId])
+  @@index([actorId])
 }
