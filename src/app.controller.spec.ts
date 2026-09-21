@@ -1,22 +1,53 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import { Test } from '@nestjs/testing';
+import { CategoriesController } from './categories/categories.controller.js';
+import { CategoriesService } from './categories/categories.service.js';
 
-describe('AppController', () => {
-  let appController: AppController;
+describe('CategoriesController', () => {
+  const categories = [
+    {
+      id: 'parent-1',
+      name: 'Sports & Movement',
+      slug: 'sports-movement',
+      description: null,
+      children: [
+        {
+          id: 'child-1',
+          name: 'Yoga',
+          slug: 'yoga',
+          description: null,
+        },
+      ],
+    },
+  ];
+
+  const categoriesServiceMock = {
+    findAll: vi.fn(),
+  };
+
+  let controller: CategoriesController;
 
   beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
+    categoriesServiceMock.findAll.mockReset();
+
+    const module = await Test.createTestingModule({
+      controllers: [CategoriesController],
+      providers: [
+        {
+          provide: CategoriesService,
+          useValue: categoriesServiceMock,
+        },
+      ],
     }).compile();
 
-    appController = app.get<AppController>(AppController);
+    controller = module.get(CategoriesController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
+  it('returns categories with nested subcategories', async () => {
+    categoriesServiceMock.findAll.mockResolvedValue(categories);
+
+    const result = await controller.findAll();
+
+    expect(categoriesServiceMock.findAll).toHaveBeenCalledOnce();
+    expect(result).toEqual(categories);
   });
 });
