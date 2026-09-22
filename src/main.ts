@@ -1,28 +1,15 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
+import { configureApp } from './configure-app.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  configureApp(app);
+
   const configService = app.get(ConfigService);
-
-  app.enableCors({
-    origin: configService.get<string>('CORS_ORIGIN'),
-  });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  app.useGlobalFilters(new AllExceptionsFilter());
 
   const config = new DocumentBuilder()
     .setTitle('Classista API')

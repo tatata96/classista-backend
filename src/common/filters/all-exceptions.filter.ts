@@ -1,4 +1,11 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 interface ErrorResponseBody {
@@ -29,7 +36,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // failure (e.g. a database error). Log the full detail server-side, but
     // never leak internals like stack traces or driver errors to the client.
     this.logger.error(
-      exception instanceof Error ? (exception.stack ?? exception.message) : exception,
+      exception instanceof Error
+        ? (exception.stack ?? exception.message)
+        : exception,
     );
 
     const body: ErrorResponseBody = {
