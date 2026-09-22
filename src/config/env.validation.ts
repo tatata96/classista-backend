@@ -24,6 +24,10 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   CORS_ORIGIN: string;
+
+  @IsString()
+  @IsNotEmpty()
+  SUPABASE_URL: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
