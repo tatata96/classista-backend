@@ -43,11 +43,12 @@ enum ClassPlanStatus {
 
 model User {
   // DATABASE COLUMNS
-  id    String   @id @default(uuid()) @db.Uuid
-  name  String
-  email String?  @unique
-  phone String?  @unique
-  role  UserRole @default(CUSTOMER)
+  id         String   @id @default(uuid()) @db.Uuid
+  supabaseId String?  @unique @db.Uuid
+  name       String
+  email      String?  @unique
+  phone      String?  @unique
+  role       UserRole @default(CUSTOMER)
 
   // PRISMA RELATIONS (not database columns)
   // One user can have many partner memberships.
