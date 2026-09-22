@@ -66,4 +66,19 @@ describe('CategoriesService', () => {
 
     expect(result).toEqual(mockCategories);
   });
+
+  it('filters by name when a search term is provided', async () => {
+    prismaMock.category.findMany.mockResolvedValue(mockCategories);
+
+    await service.findAll('yoga');
+
+    expect(prismaMock.category.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          parentId: null,
+          name: { contains: 'yoga', mode: 'insensitive' },
+        },
+      }),
+    );
+  });
 });
