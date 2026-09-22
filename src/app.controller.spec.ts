@@ -45,7 +45,7 @@ describe('CategoriesController', () => {
   it('returns categories with nested subcategories', async () => {
     categoriesServiceMock.findAll.mockResolvedValue(categories);
 
-    const result = await controller.findAll();
+    const result = await controller.findAll({});
 
     expect(categoriesServiceMock.findAll).toHaveBeenCalledOnce();
     expect(result).toEqual(categories);
