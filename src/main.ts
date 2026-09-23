@@ -15,6 +15,12 @@ async function bootstrap() {
     .setTitle('Classista API')
     .setDescription('API documentation for Classista')
     .setVersion('1.0')
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'A Supabase access token',
+    })
     .build();
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);
