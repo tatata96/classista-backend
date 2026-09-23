@@ -3,17 +3,20 @@
 Backend API for Classista, a platform for discovering and booking sports,
 wellness, and creative classes.
 
-This service is built with NestJS and TypeScript. The repository is currently in
-initial setup, with database, authentication, and product modules still to come.
+This service is built with NestJS and TypeScript. Authentication uses Supabase
+Auth (registration, login, password security, tokens); NestJS verifies each
+Supabase issued token and owns authorization against the app's own Prisma data.
+Partner and studio scoped authorization is still to come.
 
 ## Tech Stack
 
 - NestJS
 - TypeScript
 - Node.js
+- PostgreSQL (Supabase) and Prisma
+- Supabase Auth
 - Vitest
 - oxlint
-- PostgreSQL and Prisma planned
 
 ## Getting Started
 
@@ -27,6 +30,18 @@ initial setup, with database, authentication, and product modules still to come.
 ```bash
 npm install
 ```
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and fill in real values (never commit `.env`):
+
+| Variable | Purpose | Safe to expose publicly? |
+|---|---|---|
+| `DATABASE_URL` | Postgres connection string (Supabase, session mode pooler) | No, contains a password |
+| `NODE_ENV` | `development` \| `test` \| `production` | Yes |
+| `PORT` | Port the HTTP server listens on | Yes |
+| `CORS_ORIGIN` | Allowed frontend origin(s) | Yes |
+| `SUPABASE_URL` | The Supabase project's API URL, used to verify auth tokens against its public JWKS | Yes, the frontend needs the same value |
 
 ### Run Locally
 
@@ -60,16 +75,14 @@ npm run test:e2e     # Run end-to-end tests
 
 ## Current API
 
-The starter API currently exposes:
+Full interactive docs (Swagger UI) are served at `/api/docs` when the app is running.
 
 ```http
-GET /
-```
-
-Response:
-
-```text
-Hello World!
+GET /                 # Health check style root route
+GET /categories        # Public: list categories and their subcategories
+GET /auth/me           # Requires "Authorization: Bearer <Supabase access token>"
+                        # Returns the authenticated user's Classista profile,
+                        # creating their Classista User record on first sight
 ```
 
 ## Project Structure
@@ -77,23 +90,24 @@ Hello World!
 ```text
 src/
   app.controller.ts       Root HTTP controller
-  app.controller.spec.ts  Unit test for the root controller
   app.module.ts           Root NestJS module
-  app.service.ts          Root application service
-  main.ts                 Application bootstrap
+  main.ts                 Application bootstrap, Swagger setup
+  auth/                   Supabase token verification, the auth guard, GET /auth/me
+  categories/             Public category browsing
+  lib/database/           PrismaService, the app's database connection
+  config/                 Environment variable validation
+  common/filters/         Global exception handling
 test/
   app.e2e-spec.ts         End-to-end test suite
 ```
 
 ## Roadmap
 
-- Database configuration
-- Prisma schema and migrations
-- Authentication and authorization
+- Partner and studio authorization (scoping dashboard access to the authenticated partner)
 - Partner and venue management
 - Class plans and session generation
 - Booking and credit management
-- API validation, error handling, and documentation
+- SMTP provider for Supabase's transactional email (confirmation, password reset), before real user onboarding
 
 ## License
 
