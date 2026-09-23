@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { SupabaseAuthService } from '../supabase-auth.service.js';
+import { AuthService } from '../auth.service.js';
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
-  constructor(private readonly supabaseAuth: SupabaseAuthService) {}
+  constructor(
+    private readonly supabaseAuth: SupabaseAuthService,
+    private readonly authService: AuthService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -19,11 +23,14 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing bearer token');
     }
 
+    let payload;
     try {
-      request.supabaseUser = await this.supabaseAuth.verifyAccessToken(token);
+      payload = await this.supabaseAuth.verifyAccessToken(token);
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+
+    request.user = await this.authService.findOrCreateUser(payload);
 
     return true;
   }

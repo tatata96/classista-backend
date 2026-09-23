@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SupabaseAuthGuard } from './supabase-auth.guard.js';
 import { SupabaseAuthService } from '../supabase-auth.service.js';
+import { AuthService } from '../auth.service.js';
 
 // Full coverage (missing, invalid, expired, and valid tokens) lands at
 // Checkpoint 6; this just confirms the guard wires up correctly for now.
@@ -12,6 +13,7 @@ describe('SupabaseAuthGuard', () => {
       providers: [
         SupabaseAuthGuard,
         { provide: SupabaseAuthService, useValue: {} },
+        { provide: AuthService, useValue: {} },
       ],
     }).compile();
 

@@ -1,9 +1,9 @@
-import type { JWTPayload } from 'jose';
+import type { AuthenticatedUser } from '../auth.service.js';
 
 declare global {
   namespace Express {
     interface Request {
-      supabaseUser?: JWTPayload;
+      user?: AuthenticatedUser;
     }
   }
 }
