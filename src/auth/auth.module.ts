@@ -8,7 +8,7 @@ import { AuthController } from './auth.controller.js';
 @Module({
   imports: [PrismaModule],
   providers: [SupabaseAuthService, SupabaseAuthGuard, AuthService],
-  exports: [SupabaseAuthService, SupabaseAuthGuard],
+  exports: [SupabaseAuthService, SupabaseAuthGuard, AuthService],
   controllers: [AuthController],
 })
 export class AuthModule {}

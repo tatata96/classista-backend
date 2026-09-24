@@ -6,6 +6,7 @@ import { PrismaModule } from './lib/database/prisma.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { validateEnv } from './config/env.validation.js';
 import { AuthModule } from './auth/auth.module.js';
+import { PartnersModule } from './partners/partners.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuthModule } from './auth/auth.module.js';
     PrismaModule,
     CategoriesModule,
     AuthModule,
+    PartnersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
