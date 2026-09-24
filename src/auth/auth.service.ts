@@ -2,6 +2,7 @@ import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/co
 import type { JWTPayload } from 'jose';
 import { PrismaService } from '../lib/database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { MePartnerDto } from './dto/me-partner.dto.js';
 
 const AUTHENTICATED_USER_SELECT = {
   id: true,
@@ -46,6 +47,36 @@ export class AuthService {
       }
       throw error;
     }
+  }
+
+  /**
+   * The partner this user belongs to, for dashboard display only (null if none).
+   * This is NOT authorization: PartnerAccessGuard re-checks the database on
+   * every partner request, whatever the dashboard shows or sends.
+   * Returned even when the partner is INACTIVE, so the dashboard can show
+   * that state (partner endpoints still refuse it with 403).
+   *
+   * The MVP rule is one partner per user, but the schema does not enforce it
+   * yet (a separate PR will). Until then, if a user has several memberships,
+   * the OLDEST (by createdAt) is returned so the result is deterministic.
+   */
+  async getPartner(userId: string): Promise<MePartnerDto | null> {
+    const membership = await this.prisma.partnerMembership.findFirst({
+      where: { userId },
+      select: { role: true, partner: { select: { id: true, name: true, status: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!membership) {
+      return null;
+    }
+
+    return {
+      id: membership.partner.id,
+      name: membership.partner.name,
+      status: membership.partner.status,
+      role: membership.role,
+    };
   }
 
   private resolveName(payload: JWTPayload, email: string | null): string {

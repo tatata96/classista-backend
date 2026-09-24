@@ -82,7 +82,11 @@ GET /                 # Health check style root route
 GET /categories        # Public: list categories and their subcategories
 GET /auth/me           # Requires "Authorization: Bearer <Supabase access token>"
                         # Returns the authenticated user's Classista profile,
-                        # creating their Classista User record on first sight
+                        # creating their Classista User record on first sight,
+                        # plus their partner (id, name, status, role) or null, for display only.
+                        # Inactive partners are still returned. MVP rule is one partner per
+                        # user but the DB doesn't enforce it yet: if there are several,
+                        # the oldest membership is returned.
 ```
 
 ## Project Structure
