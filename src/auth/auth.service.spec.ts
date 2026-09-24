@@ -9,12 +9,16 @@ describe('AuthService', () => {
     user: {
       upsert: vi.fn(),
     },
+    partnerMembership: {
+      findFirst: vi.fn(),
+    },
   };
 
   let service: AuthService;
 
   beforeEach(async () => {
     prismaMock.user.upsert.mockReset();
+    prismaMock.partnerMembership.findFirst.mockReset();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [AuthService, { provide: PrismaService, useValue: prismaMock }],
@@ -155,5 +159,52 @@ describe('AuthService', () => {
     prismaMock.user.upsert.mockRejectedValue(dbError);
 
     await expect(service.findOrCreateUser({ sub: 'supabase-4' })).rejects.toBe(dbError);
+  });
+  describe('getPartner', () => {
+    it('returns null for a user with no membership', async () => {
+      prismaMock.partnerMembership.findFirst.mockResolvedValue(null);
+
+      await expect(service.getPartner('u1')).resolves.toBeNull();
+    });
+
+    it('flattens the membership into the partner shape the dashboard needs', async () => {
+      prismaMock.partnerMembership.findFirst.mockResolvedValue({
+        role: 'OWNER',
+        partner: { id: 'p1', name: 'Core Studio', status: 'ACTIVE' },
+      });
+
+      await expect(service.getPartner('u1')).resolves.toEqual({
+        id: 'p1',
+        name: 'Core Studio',
+        status: 'ACTIVE',
+        role: 'OWNER',
+      });
+    });
+
+    it('still returns an INACTIVE partner, with its status, so the dashboard can handle it', async () => {
+      prismaMock.partnerMembership.findFirst.mockResolvedValue({
+        role: 'STAFF',
+        partner: { id: 'p1', name: 'Core Studio', status: 'INACTIVE' },
+      });
+
+      await expect(service.getPartner('u1')).resolves.toEqual({
+        id: 'p1',
+        name: 'Core Studio',
+        status: 'INACTIVE',
+        role: 'STAFF',
+      });
+    });
+
+    it("only queries the given user's membership, oldest first, and selects nothing sensitive", async () => {
+      prismaMock.partnerMembership.findFirst.mockResolvedValue(null);
+
+      await service.getPartner('u1');
+
+      expect(prismaMock.partnerMembership.findFirst).toHaveBeenCalledWith({
+        where: { userId: 'u1' },
+        select: { role: true, partner: { select: { id: true, name: true, status: true } } },
+        orderBy: { createdAt: 'asc' },
+      });
+    });
   });
 });
