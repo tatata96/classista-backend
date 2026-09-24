@@ -1,10 +1,12 @@
 import { Test } from '@nestjs/testing';
-import type { INestApplication } from '@nestjs/common';
+import { Controller, Get, Logger, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter.js';
 import { PartnersModule } from '../src/partners/partners.module.js';
 import { PrismaService } from '../src/lib/database/prisma.service.js';
 import { SupabaseAuthService } from '../src/auth/supabase-auth.service.js';
+import { CurrentPartner } from '../src/partners/decorators/current-partner.decorator.js';
+import type { PartnerContext } from '../src/partners/types/partner-context.js';
 
 /**
  * Integration test: the REAL SupabaseAuthGuard, AuthService, PartnerAccessGuard,
@@ -196,5 +198,36 @@ describe('GET /partners/:partnerId (integration)', () => {
     it('returns 403 for a malformed partner id instead of a 500', async () => {
       await get('not-a-uuid', 'alice-token').expect(403);
     });
+  });
+});
+
+describe('@CurrentPartner() on an unguarded route (developer mistake)', () => {
+  // A deliberately misconfigured route: uses the decorator but no PartnerAccessGuard.
+  @Controller('misconfigured')
+  class MisconfiguredController {
+    @Get()
+    find(@CurrentPartner() partner: PartnerContext) {
+      return partner;
+    }
+  }
+
+  it('returns only the generic 500 to the client and logs the real cause server-side', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [MisconfiguredController],
+    }).compile();
+    const app = moduleRef.createNestApplication();
+    app.useGlobalFilters(new AllExceptionsFilter());
+    await app.init();
+    // The filter logs unexpected errors through Nest's Logger; keep test output quiet.
+    const logSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    const res = await request(app.getHttpServer()).get('/misconfigured').expect(500);
+
+    expect(res.body.message).toBe('Something went wrong. Please try again later.');
+    expect(JSON.stringify(res.body)).not.toContain('CurrentPartner');
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('@CurrentPartner()'));
+
+    logSpy.mockRestore();
+    await app.close();
   });
 });

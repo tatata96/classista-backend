@@ -1,8 +1,4 @@
-import {
-  createParamDecorator,
-  ExecutionContext,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 import type { PartnerContext } from '../types/partner-context.js';
 
@@ -19,10 +15,11 @@ export const CurrentPartner = createParamDecorator(
 
     // Reaching this means a developer forgot the guard: a server bug, not a
     // client error. Failing loudly beats silently running with no partner.
+    // A plain Error (not an HttpException) on purpose: AllExceptionsFilter logs
+    // it server-side and sends the client only a generic 500, so this
+    // implementation detail never leaks.
     if (!request.partnerContext) {
-      throw new InternalServerErrorException(
-        '@CurrentPartner() used on a route without PartnerAccessGuard',
-      );
+      throw new Error('@CurrentPartner() used on a route without PartnerAccessGuard');
     }
 
     return request.partnerContext;
