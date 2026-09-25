@@ -10,7 +10,7 @@ describe('AuthService', () => {
       upsert: vi.fn(),
     },
     partnerMembership: {
-      findFirst: vi.fn(),
+      findUnique: vi.fn(),
     },
   };
 
@@ -18,7 +18,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     prismaMock.user.upsert.mockReset();
-    prismaMock.partnerMembership.findFirst.mockReset();
+    prismaMock.partnerMembership.findUnique.mockReset();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [AuthService, { provide: PrismaService, useValue: prismaMock }],
@@ -162,13 +162,13 @@ describe('AuthService', () => {
   });
   describe('getPartner', () => {
     it('returns null for a user with no membership', async () => {
-      prismaMock.partnerMembership.findFirst.mockResolvedValue(null);
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
 
       await expect(service.getPartner('u1')).resolves.toBeNull();
     });
 
     it('flattens the membership into the partner shape the dashboard needs', async () => {
-      prismaMock.partnerMembership.findFirst.mockResolvedValue({
+      prismaMock.partnerMembership.findUnique.mockResolvedValue({
         role: 'OWNER',
         partner: { id: 'p1', name: 'Core Studio', status: 'ACTIVE' },
       });
@@ -182,7 +182,7 @@ describe('AuthService', () => {
     });
 
     it('still returns an INACTIVE partner, with its status, so the dashboard can handle it', async () => {
-      prismaMock.partnerMembership.findFirst.mockResolvedValue({
+      prismaMock.partnerMembership.findUnique.mockResolvedValue({
         role: 'STAFF',
         partner: { id: 'p1', name: 'Core Studio', status: 'INACTIVE' },
       });
@@ -195,15 +195,14 @@ describe('AuthService', () => {
       });
     });
 
-    it("only queries the given user's membership, oldest first, and selects nothing sensitive", async () => {
-      prismaMock.partnerMembership.findFirst.mockResolvedValue(null);
+    it("only queries the given user's membership and selects nothing sensitive", async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
 
       await service.getPartner('u1');
 
-      expect(prismaMock.partnerMembership.findFirst).toHaveBeenCalledWith({
+      expect(prismaMock.partnerMembership.findUnique).toHaveBeenCalledWith({
         where: { userId: 'u1' },
         select: { role: true, partner: { select: { id: true, name: true, status: true } } },
-        orderBy: { createdAt: 'asc' },
       });
     });
   });

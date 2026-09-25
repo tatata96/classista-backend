@@ -20,8 +20,7 @@ export class MeResponseDto {
     nullable: true,
     description:
       'The partner this user belongs to, or null for a regular customer. ' +
-      'The MVP intends one partner per user, but the database does not enforce it yet: ' +
-      'if a user has several memberships, the oldest one is returned. ' +
+      'A user belongs to at most one partner. ' +
       'Use it to display the studio. It does not grant access: the backend re-checks every partner request.',
   })
   partner: MePartnerDto | null;

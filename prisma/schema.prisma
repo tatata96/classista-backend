@@ -51,8 +51,8 @@ model User {
   role       UserRole @default(CUSTOMER)
 
   // PRISMA RELATIONS (not database columns)
-  // One user can have many partner memberships.
-  memberships PartnerMembership[]
+  // MVP rule: a user belongs to at most one partner.
+  membership PartnerMembership?
 
   // One user can make many bookings as a customer.
   bookings      Booking[]
@@ -95,13 +95,14 @@ model Partner {
 
 // ==========================================
 // PARTNER MEMBERSHIP
-// Connects users and partners.
+// Connects users and partners. A user has at most one membership (userId is
+// unique); a partner can have many members.
 // ==========================================
 
 model PartnerMembership {
   // DATABASE COLUMNS
   id        String      @id @default(uuid()) @db.Uuid
-  userId    String      @db.Uuid
+  userId    String      @unique @db.Uuid
   partnerId String      @db.Uuid
   role      PartnerRole
 
@@ -113,10 +114,6 @@ model PartnerMembership {
   // DATABASE COLUMNS
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // DATABASE CONSTRAINT
-  // Prevent duplicate memberships for the same user and partner.
-  @@unique([userId, partnerId])
 }
 
 // ==========================================
