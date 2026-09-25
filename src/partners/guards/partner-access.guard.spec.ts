@@ -29,9 +29,8 @@ describe('PartnerAccessGuard', () => {
   const prismaMock = {
     partnerMembership: {
       findUnique: vi.fn(
-        async ({ where }: { where: { userId_partnerId: { userId: string; partnerId: string } } }) => {
-          const { userId, partnerId } = where.userId_partnerId;
-          const row = memberships.find((m) => m.userId === userId && m.partnerId === partnerId);
+        async ({ where }: { where: { userId: string } }) => {
+          const row = memberships.find((m) => m.userId === where.userId);
           return row
             ? { partnerId: row.partnerId, role: row.role, partner: { status: row.status } }
             : null;
@@ -88,18 +87,18 @@ describe('PartnerAccessGuard', () => {
     expect(request.partnerContext).toEqual({ partnerId: PARTNER_A, membershipRole: 'STAFF' });
   });
 
-  it('lets a user with two memberships access each partner, with the right role each time', async () => {
+  it('lets several users belong to the same partner, each with their own role', async () => {
     memberships.push(
       { userId: ALICE.id, partnerId: PARTNER_A, role: 'OWNER', status: 'ACTIVE' },
-      { userId: ALICE.id, partnerId: PARTNER_B, role: 'STAFF', status: 'ACTIVE' },
+      { userId: 'user-bob', partnerId: PARTNER_A, role: 'STAFF', status: 'ACTIVE' },
     );
-    const requestA = requestFor(PARTNER_A);
-    const requestB = requestFor(PARTNER_B);
+    const aliceRequest = requestFor(PARTNER_A);
+    const bobRequest = { ...requestFor(PARTNER_A), user: { ...ALICE, id: 'user-bob' } };
 
-    await expect(guard.canActivate(contextFor(requestA))).resolves.toBe(true);
-    await expect(guard.canActivate(contextFor(requestB))).resolves.toBe(true);
-    expect(requestA.partnerContext).toEqual({ partnerId: PARTNER_A, membershipRole: 'OWNER' });
-    expect(requestB.partnerContext).toEqual({ partnerId: PARTNER_B, membershipRole: 'STAFF' });
+    await expect(guard.canActivate(contextFor(aliceRequest))).resolves.toBe(true);
+    await expect(guard.canActivate(contextFor(bobRequest))).resolves.toBe(true);
+    expect(aliceRequest.partnerContext).toEqual({ partnerId: PARTNER_A, membershipRole: 'OWNER' });
+    expect(bobRequest.partnerContext).toEqual({ partnerId: PARTNER_A, membershipRole: 'STAFF' });
   });
 
   it('rejects a member of partner A who asks for partner B, and sets no context', async () => {
@@ -123,7 +122,7 @@ describe('PartnerAccessGuard', () => {
     expect(prismaMock.partnerMembership.findUnique).toHaveBeenCalledTimes(1);
     expect(prismaMock.partnerMembership.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId_partnerId: { userId: ALICE.id, partnerId: PARTNER_B } },
+        where: { userId: ALICE.id },
       }),
     );
   });

@@ -23,7 +23,7 @@ const UNKNOWN_PARTNER = '99999999-9999-4999-8999-999999999999';
 const TOKENS: Record<string, string> = {
   'alice-token': 'supabase-alice', // OWNER at Yoga Loft only
   'bob-token': 'supabase-bob', // STAFF at Pilates Co only
-  'carol-token': 'supabase-carol', // OWNER at Yoga Loft, STAFF at Pilates Co
+  'carol-token': 'supabase-carol', // STAFF at Yoga Loft (a second member of it)
   'dave-token': 'supabase-dave', // OWNER at a closed (inactive) studio
   'erin-token': 'supabase-erin', // no memberships
 };
@@ -59,16 +59,11 @@ describe('GET /partners/:partnerId (integration)', () => {
       },
     },
     partnerMembership: {
-      findUnique: async ({
-        where,
-      }: {
-        where: { userId_partnerId: { userId: string; partnerId: string } };
-      }) => {
-        const { userId, partnerId } = where.userId_partnerId;
-        const row = memberships.find((m) => m.userId === userId && m.partnerId === partnerId);
-        const partner = partners.find((p) => p.id === partnerId);
+      findUnique: async ({ where }: { where: { userId: string } }) => {
+        const row = memberships.find((m) => m.userId === where.userId);
+        const partner = partners.find((p) => p.id === row?.partnerId);
         return row && partner
-          ? { partnerId, role: row.role, partner: { status: partner.status } }
+          ? { partnerId: row.partnerId, role: row.role, partner: { status: partner.status } }
           : null;
       },
     },
@@ -92,8 +87,7 @@ describe('GET /partners/:partnerId (integration)', () => {
     memberships.push(
       { userId: 'user-supabase-alice', partnerId: YOGA_LOFT, role: 'OWNER' },
       { userId: 'user-supabase-bob', partnerId: PILATES_CO, role: 'STAFF' },
-      { userId: 'user-supabase-carol', partnerId: YOGA_LOFT, role: 'OWNER' },
-      { userId: 'user-supabase-carol', partnerId: PILATES_CO, role: 'STAFF' },
+      { userId: 'user-supabase-carol', partnerId: YOGA_LOFT, role: 'STAFF' },
       { userId: 'user-supabase-dave', partnerId: CLOSED_STUDIO, role: 'OWNER' },
     );
 
@@ -150,12 +144,12 @@ describe('GET /partners/:partnerId (integration)', () => {
       await get(PILATES_CO, 'bob-token').expect(200);
     });
 
-    it('lets a user with two memberships read each partner, and gets the right data', async () => {
-      const yoga = await get(YOGA_LOFT, 'carol-token').expect(200);
-      const pilates = await get(PILATES_CO, 'carol-token').expect(200);
+    it('lets several members of the same partner read it', async () => {
+      const owner = await get(YOGA_LOFT, 'alice-token').expect(200);
+      const staff = await get(YOGA_LOFT, 'carol-token').expect(200);
 
-      expect(yoga.body.name).toBe('Yoga Loft');
-      expect(pilates.body.name).toBe('Pilates Co');
+      expect(owner.body.name).toBe('Yoga Loft');
+      expect(staff.body.name).toBe('Yoga Loft');
     });
 
     it('denies a member of one partner access to another partner (cross-partner)', async () => {

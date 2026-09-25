@@ -42,8 +42,10 @@ export class PartnerAccessGuard implements CanActivate {
       throw new ForbiddenException(NO_ACCESS_MESSAGE);
     }
 
+    // A user has at most one membership (userId is unique), so look it up by
+    // user and then check it is for the partner named in the URL.
     const membership = await this.prisma.partnerMembership.findUnique({
-      where: { userId_partnerId: { userId: request.user.id, partnerId } },
+      where: { userId: request.user.id },
       select: {
         partnerId: true,
         role: true,
@@ -51,7 +53,7 @@ export class PartnerAccessGuard implements CanActivate {
       },
     });
 
-    if (!membership) {
+    if (!membership || membership.partnerId !== partnerId) {
       throw new ForbiddenException(NO_ACCESS_MESSAGE);
     }
 

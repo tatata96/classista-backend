@@ -56,15 +56,13 @@ export class AuthService {
    * Returned even when the partner is INACTIVE, so the dashboard can show
    * that state (partner endpoints still refuse it with 403).
    *
-   * The MVP rule is one partner per user, but the schema does not enforce it
-   * yet (a separate PR will). Until then, if a user has several memberships,
-   * the OLDEST (by createdAt) is returned so the result is deterministic.
+   * The MVP rule is one partner per user, enforced by a unique userId on
+   * PartnerMembership, so there is at most one membership to find.
    */
   async getPartner(userId: string): Promise<MePartnerDto | null> {
-    const membership = await this.prisma.partnerMembership.findFirst({
+    const membership = await this.prisma.partnerMembership.findUnique({
       where: { userId },
       select: { role: true, partner: { select: { id: true, name: true, status: true } } },
-      orderBy: { createdAt: 'asc' },
     });
 
     if (!membership) {
