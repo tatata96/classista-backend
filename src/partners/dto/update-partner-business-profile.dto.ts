@@ -7,13 +7,18 @@ import {
   IsUrl,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 // Every field optional: this is a partial update, same convention as
 // UpdateVenueDto. Absent fields are left unchanged.
 export class UpdatePartnerBusinessProfileDto {
+  // @IsOptional() alone would also accept null (it skips validation for both
+  // null and undefined), but name must never be nullable. ValidateIf skips
+  // validation only when the field is truly absent (undefined); an explicit
+  // null still reaches IsString/IsNotEmpty and is rejected by them.
   @ApiPropertyOptional({ example: 'Kadıköy Yoga Studio' })
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsString()
   @IsNotEmpty()
   @MaxLength(150)
@@ -70,11 +75,13 @@ export class UpdatePartnerBusinessProfileDto {
   @MaxLength(50)
   tiktokHandle?: string | null;
 
+  // Same reasoning as name above: ValidateIf, not IsOptional, so null is
+  // rejected instead of silently skipped.
   @ApiPropertyOptional({
     example: 720,
     description: 'Minutes before a class starts that bookings close',
   })
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(1)
   bookingCutoffMinutes?: number;
