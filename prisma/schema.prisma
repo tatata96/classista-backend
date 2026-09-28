@@ -81,6 +81,20 @@ model Partner {
   description String?
   status      PartnerStatus @default(ACTIVE)
 
+  // Contact information (Business Profile)
+  phone      String?
+  websiteUrl String?
+
+  // Social handles, not full URLs (Business Profile)
+  instagramHandle String?
+  xHandle         String?
+  tiktokHandle    String?
+  facebookUrl     String?
+
+  // Minutes before a class starts that bookings close. Partner-wide for the
+  // MVP; no per-venue or per-class override yet. 720 = 12 hours.
+  bookingCutoffMinutes Int @default(720)
+
   // PRISMA RELATIONS (not database columns)
   // One partner can have many of each.
   memberships PartnerMembership[]
