@@ -165,4 +165,68 @@ describe('PartnerAccessGuard', () => {
       ForbiddenException,
     );
   });
+
+  describe('"my partner" routes (no :partnerId in the URL)', () => {
+    const noPartnerRequest = (extra: Record<string, unknown> = {}) =>
+      ({ user: ALICE, params: {}, ...extra }) as Record<string, unknown> & {
+        partnerContext?: unknown;
+      };
+
+    it("resolves the partner from the user's own membership", async () => {
+      memberships.push({
+        userId: ALICE.id,
+        partnerId: PARTNER_A,
+        role: 'STAFF',
+        status: 'ACTIVE',
+      });
+      const request = noPartnerRequest();
+
+      await expect(guard.canActivate(contextFor(request))).resolves.toBe(true);
+      expect(request.partnerContext).toEqual({
+        partnerId: PARTNER_A,
+        membershipRole: 'STAFF',
+      });
+    });
+
+    it('ignores a partnerId in the body or query', async () => {
+      memberships.push({
+        userId: ALICE.id,
+        partnerId: PARTNER_A,
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
+      const request = noPartnerRequest({
+        body: { partnerId: PARTNER_B },
+        query: { partnerId: PARTNER_B },
+      });
+
+      await expect(guard.canActivate(contextFor(request))).resolves.toBe(true);
+      expect(request.partnerContext).toEqual({
+        partnerId: PARTNER_A,
+        membershipRole: 'OWNER',
+      });
+    });
+
+    it('rejects a user with no membership', async () => {
+      const request = noPartnerRequest();
+
+      await expect(guard.canActivate(contextFor(request))).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(request.partnerContext).toBeUndefined();
+    });
+
+    it('rejects a member of an INACTIVE partner', async () => {
+      memberships.push({
+        userId: ALICE.id,
+        partnerId: PARTNER_INACTIVE,
+        role: 'OWNER',
+        status: 'INACTIVE',
+      });
+
+      await expect(
+        guard.canActivate(contextFor(noPartnerRequest())),
+      ).rejects.toThrow('This partner is inactive');
+    });
+  });
 });

@@ -48,6 +48,7 @@ Do not invent business rules when a decision is missing. Identify the unresolved
 ## Code Standards
 
 - Use strict TypeScript types.
+- Name boolean variables and properties with an `is`/`has` prefix (e.g. `hasPartnerIdParam`, `isActive`).
 - Validate incoming requests using DTOs and NestJS validation pipes.
 - Use appropriate NestJS exceptions for API errors.
 - Use database transactions where multiple related writes must succeed together.
