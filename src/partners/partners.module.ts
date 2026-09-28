@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { PrismaModule } from '../lib/database/prisma.module.js';
+import { BusinessProfileController } from './business-profile.controller.js';
 import { PartnersController } from './partners.controller.js';
 import { PartnersService } from './partners.service.js';
 
@@ -8,7 +9,7 @@ import { PartnersService } from './partners.service.js';
   // AuthModule: needed by SupabaseAuthGuard, which Nest builds inside this module.
   // PrismaModule: needed by PartnerAccessGuard and PartnersService.
   imports: [AuthModule, PrismaModule],
-  controllers: [PartnersController],
+  controllers: [PartnersController, BusinessProfileController],
   providers: [PartnersService],
 })
 export class PartnersModule {}
