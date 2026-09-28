@@ -19,53 +19,56 @@ export class UpdatePartnerBusinessProfileDto {
   @MaxLength(150)
   name?: string;
 
-  @ApiPropertyOptional()
+  // null explicitly clears the field; undefined (the field absent from the
+  // request body) leaves it unchanged. @IsOptional() skips the validators
+  // below for both null and undefined, so only non-null values are checked.
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(2000)
-  description?: string;
+  description?: string | null;
 
-  @ApiPropertyOptional({ example: '+90 216 555 00 00' })
+  @ApiPropertyOptional({ type: String, nullable: true, example: '+90 216 555 00 00' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(30)
-  phone?: string;
+  phone?: string | null;
 
-  @ApiPropertyOptional({ example: 'https://kadikoyyoga.com' })
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'https://kadikoyyoga.com' })
   @IsOptional()
   @IsUrl()
   @MaxLength(2048)
-  websiteUrl?: string;
+  websiteUrl?: string | null;
 
-  @ApiPropertyOptional({ example: 'https://facebook.com/kadikoyyoga' })
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'https://facebook.com/kadikoyyoga' })
   @IsOptional()
   @IsUrl()
   @MaxLength(2048)
-  facebookUrl?: string;
+  facebookUrl?: string | null;
 
   // Handles, not full profile URLs (e.g. "kadikoyyoga", not a URL).
-  @ApiPropertyOptional({ example: 'kadikoyyoga' })
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'kadikoyyoga' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  instagramHandle?: string;
+  instagramHandle?: string | null;
 
-  @ApiPropertyOptional({ example: 'kadikoyyoga' })
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'kadikoyyoga' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  xHandle?: string;
+  xHandle?: string | null;
 
-  @ApiPropertyOptional({ example: 'kadikoyyoga' })
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'kadikoyyoga' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  tiktokHandle?: string;
+  tiktokHandle?: string | null;
 
   @ApiPropertyOptional({
     example: 720,
