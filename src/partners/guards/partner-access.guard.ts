@@ -15,13 +15,17 @@ import { PartnerStatus } from '../../generated/prisma/enums.js';
 const NO_ACCESS_MESSAGE = 'You do not have access to this partner';
 
 /**
- * Authorization guard: may the authenticated user act for the partner named in
- * the route (`:partnerId`)? Must run AFTER SupabaseAuthGuard:
+ * Authorization guard: may the authenticated user act for a partner? Must run
+ * AFTER SupabaseAuthGuard:
  *
  *   @UseGuards(SupabaseAuthGuard, PartnerAccessGuard)
  *
- * The route's partnerId is only a claim. It becomes trusted only once a
- * PartnerMembership row for (this user, this partner) exists in the database.
+ * Two kinds of route are supported:
+ * - `/partners/:partnerId/...` names a partner. That partnerId is only a claim;
+ *   it becomes trusted once a PartnerMembership row for (this user, this
+ *   partner) exists in the database.
+ * - `/partner/...` (no `:partnerId`) means "my partner": the partner is taken
+ *   from the user's own membership, so the client never names one.
  */
 @Injectable()
 export class PartnerAccessGuard implements CanActivate {
@@ -35,15 +39,17 @@ export class PartnerAccessGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
-    const partnerId: unknown = request.params.partnerId;
+    // undefined only when the route has no :partnerId segment ("my partner" routes).
+    const requestedPartnerId: unknown = request.params.partnerId;
+    const hasPartnerIdParam = requestedPartnerId !== undefined;
 
     // Checking the format first stops Prisma throwing (-> 500) on ids like "abc".
-    if (typeof partnerId !== 'string' || !isUUID(partnerId)) {
+    if (hasPartnerIdParam && (typeof requestedPartnerId !== 'string' || !isUUID(requestedPartnerId))) {
       throw new ForbiddenException(NO_ACCESS_MESSAGE);
     }
 
     // A user has at most one membership (userId is unique), so look it up by
-    // user and then check it is for the partner named in the URL.
+    // user and then, if the URL names a partner, check it is that one.
     const membership = await this.prisma.partnerMembership.findUnique({
       where: { userId: request.user.id },
       select: {
@@ -53,7 +59,7 @@ export class PartnerAccessGuard implements CanActivate {
       },
     });
 
-    if (!membership || membership.partnerId !== partnerId) {
+    if (!membership || (hasPartnerIdParam && membership.partnerId !== requestedPartnerId)) {
       throw new ForbiddenException(NO_ACCESS_MESSAGE);
     }
 

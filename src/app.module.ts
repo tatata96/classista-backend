@@ -7,6 +7,7 @@ import { CategoriesModule } from './categories/categories.module.js';
 import { validateEnv } from './config/env.validation.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PartnersModule } from './partners/partners.module.js';
+import { VenuesModule } from './venues/venues.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PartnersModule } from './partners/partners.module.js';
     CategoriesModule,
     AuthModule,
     PartnersModule,
+    VenuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
