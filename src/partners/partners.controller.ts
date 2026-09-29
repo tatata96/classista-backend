@@ -1,13 +1,27 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard.js';
 import { CurrentPartner } from './decorators/current-partner.decorator.js';
+import { OnboardPartnerDto } from './dto/onboard-partner.dto.js';
+import { OnboardPartnerResponseDto } from './dto/onboard-partner-response.dto.js';
 import { PartnerResponseDto } from './dto/partner-response.dto.js';
 import { PartnerAccessGuard } from './guards/partner-access.guard.js';
 import { PartnersService } from './partners.service.js';
@@ -29,5 +43,28 @@ export class PartnersController {
   })
   findOne(@CurrentPartner() partner: PartnerContext): Promise<PartnerResponseDto> {
     return this.partnersService.findOne(partner.partnerId);
+  }
+
+  // No PartnerAccessGuard: a user calling this has no PartnerMembership yet,
+  // so that guard would always reject them. SupabaseAuthGuard alone is
+  // enough to know who is onboarding.
+  @Post('onboarding')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiCreatedResponse({
+    description: 'Creates the partner, an OWNER membership, and the first venue',
+    type: OnboardPartnerResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid request body' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
+  @ApiConflictResponse({ description: 'This user has already completed onboarding' })
+  async onboard(
+    @Req() request: Request,
+    @Body() dto: OnboardPartnerDto,
+  ): Promise<OnboardPartnerResponseDto> {
+    if (!request.user) {
+      throw new UnauthorizedException();
+    }
+
+    return this.partnersService.onboard(request.user.id, dto);
   }
 }

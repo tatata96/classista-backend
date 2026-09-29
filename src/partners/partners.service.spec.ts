@@ -1,10 +1,12 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../lib/database/prisma.service.js';
+import type { OnboardPartnerDto } from './dto/onboard-partner.dto.js';
 import { PartnersService } from './partners.service.js';
 
 const PARTNER_ID = '11111111-1111-4111-8111-111111111111';
+const USER_ID = 'user-alice';
 
 const BUSINESS_PROFILE = {
   id: PARTNER_ID,
@@ -19,12 +21,33 @@ const BUSINESS_PROFILE = {
   bookingCutoffMinutes: 720,
 };
 
+const ONBOARD_DTO: OnboardPartnerDto = {
+  partner: { name: 'Kadıköy Yoga Studio', description: 'A cozy studio.' },
+  venue: {
+    addressLine: 'Bahariye Caddesi 12',
+    district: 'Kadıköy',
+    city: 'Istanbul',
+  },
+} as OnboardPartnerDto;
+
 describe('PartnersService', () => {
+  // A tiny fake transactional client: $transaction just runs the callback
+  // against this same mock, the way Prisma's interactive transactions do.
+  const txMock = {
+    partner: { create: vi.fn() },
+    partnerMembership: { create: vi.fn() },
+    venue: { create: vi.fn() },
+  };
+
   const prismaMock = {
     partner: {
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    partnerMembership: {
+      findUnique: vi.fn(),
+    },
+    $transaction: vi.fn(async (callback: (tx: typeof txMock) => unknown) => callback(txMock)),
   };
 
   let service: PartnersService;
@@ -32,6 +55,11 @@ describe('PartnersService', () => {
   beforeEach(async () => {
     prismaMock.partner.findUnique.mockReset();
     prismaMock.partner.update.mockReset();
+    prismaMock.partnerMembership.findUnique.mockReset();
+    prismaMock.$transaction.mockClear();
+    txMock.partner.create.mockReset();
+    txMock.partnerMembership.create.mockReset();
+    txMock.venue.create.mockReset();
 
     const module = await Test.createTestingModule({
       providers: [PartnersService, { provide: PrismaService, useValue: prismaMock }],
@@ -160,6 +188,110 @@ describe('PartnersService', () => {
       await expect(
         service.updateBusinessProfile(PARTNER_ID, { name: 'Anything' }),
       ).rejects.toThrow(dbError);
+    });
+  });
+
+  describe('onboard', () => {
+    it('rejects a user who already has a membership, without opening a transaction', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue({ id: 'existing-membership' });
+
+      await expect(service.onboard(USER_ID, ONBOARD_DTO)).rejects.toThrow(ConflictException);
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('creates the partner, an OWNER membership, and the venue in one transaction', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
+      const createdPartner = { ...BUSINESS_PROFILE, id: PARTNER_ID };
+      txMock.partner.create.mockResolvedValue(createdPartner);
+      const createdVenue = { id: 'venue-1', name: 'Kadıköy Yoga Studio', timezone: 'Europe/Istanbul' };
+      txMock.venue.create.mockResolvedValue(createdVenue);
+
+      const result = await service.onboard(USER_ID, ONBOARD_DTO);
+
+      expect(txMock.partner.create).toHaveBeenCalledWith({
+        data: { name: ONBOARD_DTO.partner.name, description: ONBOARD_DTO.partner.description },
+        select: expect.objectContaining({ id: true, name: true }),
+      });
+      expect(txMock.partnerMembership.create).toHaveBeenCalledWith({
+        data: { userId: USER_ID, partnerId: PARTNER_ID, role: 'OWNER' },
+      });
+      expect(result).toEqual({ partner: createdPartner, venue: createdVenue });
+    });
+
+    it('falls back to the partner name when venue.name is omitted', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
+      txMock.partner.create.mockResolvedValue({ ...BUSINESS_PROFILE, id: PARTNER_ID });
+      txMock.venue.create.mockResolvedValue({ id: 'venue-1' });
+
+      await service.onboard(USER_ID, ONBOARD_DTO);
+
+      expect(txMock.venue.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: ONBOARD_DTO.partner.name }),
+        }),
+      );
+    });
+
+    it('uses the provided venue.name when given, instead of the partner name', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
+      txMock.partner.create.mockResolvedValue({ ...BUSINESS_PROFILE, id: PARTNER_ID });
+      txMock.venue.create.mockResolvedValue({ id: 'venue-1' });
+      const dto: OnboardPartnerDto = {
+        partner: ONBOARD_DTO.partner,
+        venue: { ...ONBOARD_DTO.venue, name: 'Main Studio' },
+      } as OnboardPartnerDto;
+
+      await service.onboard(USER_ID, dto);
+
+      expect(txMock.venue.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ name: 'Main Studio' }) }),
+      );
+    });
+
+    it('always sets the venue timezone to Europe/Istanbul server-side', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
+      txMock.partner.create.mockResolvedValue({ ...BUSINESS_PROFILE, id: PARTNER_ID });
+      txMock.venue.create.mockResolvedValue({ id: 'venue-1' });
+
+      await service.onboard(USER_ID, ONBOARD_DTO);
+
+      expect(txMock.venue.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ timezone: 'Europe/Istanbul' }),
+        }),
+      );
+    });
+
+    it('links the venue to the partner created earlier in the same transaction', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
+      txMock.partner.create.mockResolvedValue({ ...BUSINESS_PROFILE, id: PARTNER_ID });
+      txMock.venue.create.mockResolvedValue({ id: 'venue-1' });
+
+      await service.onboard(USER_ID, ONBOARD_DTO);
+
+      expect(txMock.venue.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ partnerId: PARTNER_ID }) }),
+      );
+    });
+
+    it('maps a concurrent duplicate-onboarding race (P2002) to ConflictException', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
+      prismaMock.$transaction.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '7.10.0',
+        }),
+      );
+
+      await expect(service.onboard(USER_ID, ONBOARD_DTO)).rejects.toThrow(ConflictException);
+    });
+
+    it('rethrows an unrelated transaction error', async () => {
+      prismaMock.partnerMembership.findUnique.mockResolvedValue(null);
+      const dbError = new Error('connection lost');
+      prismaMock.$transaction.mockRejectedValueOnce(dbError);
+
+      await expect(service.onboard(USER_ID, ONBOARD_DTO)).rejects.toThrow(dbError);
     });
   });
 });
