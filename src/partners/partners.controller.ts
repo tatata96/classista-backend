@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -53,6 +54,7 @@ export class PartnersController {
     description: 'Creates the partner, an OWNER membership, and the first venue',
     type: OnboardPartnerResponseDto,
   })
+  @ApiBadRequestResponse({ description: 'Invalid request body' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
   @ApiConflictResponse({ description: 'This user has already completed onboarding' })
   async onboard(
