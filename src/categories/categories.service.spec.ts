@@ -67,18 +67,25 @@ describe('CategoriesService', () => {
     expect(result).toEqual(mockCategories);
   });
 
-  it('filters by name when a search term is provided', async () => {
+  it('orders parents and children by name', async () => {
     prismaMock.category.findMany.mockResolvedValue(mockCategories);
 
-    await service.findAll('yoga');
+    await service.findAll();
 
     expect(prismaMock.category.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          parentId: null,
-          name: { contains: 'yoga', mode: 'insensitive' },
-        },
+        orderBy: { name: 'asc' },
+        select: expect.objectContaining({
+          children: expect.objectContaining({ orderBy: { name: 'asc' } }),
+        }),
       }),
     );
+  });
+
+  it('returns a parent without children as an empty list', async () => {
+    const parentWithoutChildren = [{ ...mockCategories[0], children: [] }];
+    prismaMock.category.findMany.mockResolvedValue(parentWithoutChildren);
+
+    await expect(service.findAll()).resolves.toEqual(parentWithoutChildren);
   });
 });

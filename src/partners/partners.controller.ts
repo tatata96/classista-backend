@@ -36,12 +36,18 @@ export class PartnersController {
   // Guards run in the order listed: authenticate first, then authorize.
   @Get(':partnerId')
   @UseGuards(SupabaseAuthGuard, PartnerAccessGuard)
-  @ApiOkResponse({ description: 'Returns the partner profile', type: PartnerResponseDto })
+  @ApiOkResponse({
+    description: 'Returns the partner profile',
+    type: PartnerResponseDto,
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
   @ApiForbiddenResponse({
-    description: 'Not a member of this partner, the partner does not exist, or it is inactive',
+    description:
+      'Not a member of this partner, the partner does not exist, or it is inactive',
   })
-  findOne(@CurrentPartner() partner: PartnerContext): Promise<PartnerResponseDto> {
+  findOne(
+    @CurrentPartner() partner: PartnerContext,
+  ): Promise<PartnerResponseDto> {
     return this.partnersService.findOne(partner.partnerId);
   }
 
@@ -51,12 +57,15 @@ export class PartnersController {
   @Post('onboarding')
   @UseGuards(SupabaseAuthGuard)
   @ApiCreatedResponse({
-    description: 'Creates the partner, an OWNER membership, and the first venue',
+    description:
+      'Creates the partner, an OWNER membership, and the first venue',
     type: OnboardPartnerResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid request body' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-  @ApiConflictResponse({ description: 'This user has already completed onboarding' })
+  @ApiConflictResponse({
+    description: 'This user has already completed onboarding',
+  })
   async onboard(
     @Req() request: Request,
     @Body() dto: OnboardPartnerDto,
