@@ -1,8 +1,7 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { CategoriesService } from './categories.service.js';
-import { ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CategoryResponseDto } from './dto/category-response.dto.js';
-import { FindCategoriesQueryDto } from './dto/find-categories-query.dto.js';
 
 @ApiTags('Categories')
 @Controller('categories')
@@ -15,8 +14,7 @@ export class CategoriesController {
     type: CategoryResponseDto,
     isArray: true,
   })
-  @ApiQuery({ name: 'search', required: false, description: 'Filter categories by name' })
-  findAll(@Query() query: FindCategoriesQueryDto) {
-    return this.categoriesService.findAll(query.search);
+  findAll() {
+    return this.categoriesService.findAll();
   }
 }

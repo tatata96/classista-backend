@@ -5,12 +5,9 @@ import { PrismaService } from '../lib/database/prisma.service.js';
 export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(search?: string) {
+  findAll() {
     return this.prisma.category.findMany({
-      where: {
-        parentId: null,
-        ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
-      },
+      where: { parentId: null },
       select: {
         id: true,
         name: true,

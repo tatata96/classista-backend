@@ -28,4 +28,20 @@ describe('CategoriesController', () => {
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
+
+  it('returns the category hierarchy from the service', async () => {
+    const hierarchy = [
+      {
+        id: 'parent-1',
+        name: 'Sport & Movement',
+        slug: 'sports-movement',
+        description: null,
+        children: [],
+      },
+    ];
+    categoriesServiceMock.findAll.mockResolvedValue(hierarchy);
+
+    await expect(controller.findAll()).resolves.toEqual(hierarchy);
+    expect(categoriesServiceMock.findAll).toHaveBeenCalledWith();
+  });
 });
