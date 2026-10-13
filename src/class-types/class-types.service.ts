@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../lib/database/prisma.service.js';
+import { CreateClassTypeDto } from './dto/create-class-type.dto.js';
 import { ClassTypeResponseDto } from './dto/class-type-response.dto.js';
 
 // Everything except partnerId and imageUrl (image management is deferred).
@@ -31,5 +32,38 @@ export class ClassTypesService {
       select: CLASS_TYPE_SELECT,
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
+  }
+
+  // partnerId comes from the authenticated partner; isActive is not in the DTO,
+  // so the schema default (true) applies.
+  async create(
+    partnerId: string,
+    dto: CreateClassTypeDto,
+  ): Promise<ClassTypeResponseDto> {
+    await this.assertLeafCategory(dto.categoryId);
+
+    return this.prisma.classType.create({
+      data: { ...dto, partnerId },
+      select: CLASS_TYPE_SELECT,
+    });
+  }
+
+  // Categories are shared reference data, so there is no partner check here.
+  // A class type must sit on a leaf (no children), never on a parent group.
+  private async assertLeafCategory(categoryId: string): Promise<void> {
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { _count: { select: { children: true } } },
+    });
+
+    if (!category) {
+      throw new BadRequestException('categoryId does not exist');
+    }
+
+    if (category._count.children > 0) {
+      throw new BadRequestException(
+        'categoryId must be a leaf category (one without subcategories)',
+      );
+    }
   }
 }

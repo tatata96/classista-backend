@@ -14,12 +14,14 @@ const PARTNER: PartnerContext = {
 describe('ClassTypesController', () => {
   const classTypesServiceMock = {
     findAll: vi.fn(),
+    create: vi.fn(),
   };
 
   let controller: ClassTypesController;
 
   beforeEach(async () => {
     classTypesServiceMock.findAll.mockReset();
+    classTypesServiceMock.create.mockReset();
 
     // Guards are bypassed: tests call controller methods directly.
     const module: TestingModule = await Test.createTestingModule({
@@ -66,6 +68,22 @@ describe('ClassTypesController', () => {
         PARTNER.partnerId,
         undefined,
       );
+    });
+  });
+
+  describe('POST /partner/class-types', () => {
+    it('creates with the verified partner id and the dto', async () => {
+      const dto = { name: 'Puppy Yoga', categoryId: 'cat-1' };
+      const created = { id: 'ct-1' };
+      classTypesServiceMock.create.mockResolvedValue(created);
+
+      const result = await controller.create(PARTNER, dto);
+
+      expect(classTypesServiceMock.create).toHaveBeenCalledWith(
+        PARTNER.partnerId,
+        dto,
+      );
+      expect(result).toBe(created);
     });
   });
 });

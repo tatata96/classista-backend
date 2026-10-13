@@ -1,7 +1,8 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiOkResponse,
   ApiTags,
@@ -13,6 +14,7 @@ import { PartnerAccessGuard } from '../partners/guards/partner-access.guard.js';
 import type { PartnerContext } from '../partners/types/partner-context.js';
 import { ClassTypesService } from './class-types.service.js';
 import { ClassTypeResponseDto } from './dto/class-type-response.dto.js';
+import { CreateClassTypeDto } from './dto/create-class-type.dto.js';
 import { FindClassTypesQueryDto } from './dto/find-class-types-query.dto.js';
 
 // "/partner/..." has no :partnerId: PartnerAccessGuard resolves the partner
@@ -40,5 +42,21 @@ export class ClassTypesController {
     @Query() query: FindClassTypesQueryDto,
   ): Promise<ClassTypeResponseDto[]> {
     return this.classTypesService.findAll(partner.partnerId, query.isActive);
+  }
+
+  @Post()
+  @ApiCreatedResponse({
+    description: 'Creates an active class type for the partner',
+    type: ClassTypeResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid body, or categoryId is unknown or not a leaf category',
+  })
+  create(
+    @CurrentPartner() partner: PartnerContext,
+    @Body() dto: CreateClassTypeDto,
+  ): Promise<ClassTypeResponseDto> {
+    return this.classTypesService.create(partner.partnerId, dto);
   }
 }
