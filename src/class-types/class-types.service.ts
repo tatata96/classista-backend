@@ -107,6 +107,35 @@ export class ClassTypesService {
     }
   }
 
+  // Soft delete: the row stays. Nothing else is
+  // touched: no plan is paused and no session is cancelled.
+  // Idempotent: an already archived type is returned as is, without a write.
+  async archive(
+    partnerId: string,
+    classTypeId: string,
+  ): Promise<ClassTypeResponseDto> {
+    const classType = await this.prisma.classType.findFirst({
+      where: { id: classTypeId, partnerId },
+      select: CLASS_TYPE_SELECT,
+    });
+
+    // Another partner's type gets the exact same 404 as a type that doesn't
+    // exist, so a caller can never tell the two apart.
+    if (!classType) {
+      throw new NotFoundException('Class Type not found');
+    }
+
+    if (!classType.isActive) {
+      return classType;
+    }
+
+    return this.prisma.classType.update({
+      where: { id: classTypeId, partnerId },
+      data: { isActive: false },
+      select: CLASS_TYPE_SELECT,
+    });
+  }
+
   // Categories are shared reference data, so there is no partner check here.
   // A class type must sit on a leaf (no children), never on a parent group.
   private async assertLeafCategory(categoryId: string): Promise<void> {

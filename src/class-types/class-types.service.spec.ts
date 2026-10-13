@@ -314,4 +314,61 @@ describe('ClassTypesService', () => {
       expect(prismaMock.category.findUnique).not.toHaveBeenCalled();
     });
   });
+
+  describe('archive', () => {
+    const CLASS_TYPE_ID = '44444444-4444-4444-8444-444444444444';
+
+    it('sets isActive to false for an active type owned by the partner', async () => {
+      prismaMock.classType.findFirst.mockResolvedValue({
+        id: CLASS_TYPE_ID,
+        isActive: true,
+      });
+      const archived = { id: CLASS_TYPE_ID, isActive: false };
+      prismaMock.classType.update.mockResolvedValue(archived);
+
+      const result = await service.archive(PARTNER_ID, CLASS_TYPE_ID);
+
+      expect(prismaMock.classType.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: CLASS_TYPE_ID, partnerId: PARTNER_ID },
+        }),
+      );
+      expect(prismaMock.classType.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: CLASS_TYPE_ID, partnerId: PARTNER_ID },
+          data: { isActive: false },
+        }),
+      );
+      expect(result).toBe(archived);
+    });
+
+    it('succeeds without writing when the type is already archived', async () => {
+      const alreadyArchived = { id: CLASS_TYPE_ID, isActive: false };
+      prismaMock.classType.findFirst.mockResolvedValue(alreadyArchived);
+
+      const result = await service.archive(PARTNER_ID, CLASS_TYPE_ID);
+
+      expect(result).toBe(alreadyArchived);
+      expect(prismaMock.classType.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for a type that does not exist or belongs to another partner', async () => {
+      prismaMock.classType.findFirst.mockResolvedValue(null);
+
+      await expect(service.archive(PARTNER_ID, CLASS_TYPE_ID)).rejects.toThrow(
+        new NotFoundException('Class Type not found'),
+      );
+      expect(prismaMock.classType.update).not.toHaveBeenCalled();
+    });
+
+    it('writes only isActive', async () => {
+      prismaMock.classType.findFirst.mockResolvedValue({ isActive: true });
+      prismaMock.classType.update.mockResolvedValue({});
+
+      await service.archive(PARTNER_ID, CLASS_TYPE_ID);
+
+      const { data } = prismaMock.classType.update.mock.calls[0][0];
+      expect(data).toEqual({ isActive: false });
+    });
+  });
 });

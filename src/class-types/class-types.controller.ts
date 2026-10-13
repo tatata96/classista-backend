@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -92,5 +94,22 @@ export class ClassTypesController {
     @Body() dto: UpdateClassTypeDto,
   ): Promise<ClassTypeResponseDto> {
     return this.classTypesService.update(partner.partnerId, id, dto);
+  }
+
+  // A POST action rather than DELETE: the class type is kept, only isActive changes.
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    description:
+      'Archives the class type (isActive false). Archiving an archived type also succeeds.',
+    type: ClassTypeResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Malformed id' })
+  @ApiNotFoundResponse({ description: 'No such class type for this partner' })
+  archive(
+    @CurrentPartner() partner: PartnerContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ClassTypeResponseDto> {
+    return this.classTypesService.archive(partner.partnerId, id);
   }
 }

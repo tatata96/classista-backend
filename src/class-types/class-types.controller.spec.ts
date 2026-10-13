@@ -16,6 +16,7 @@ describe('ClassTypesController', () => {
     findAll: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    archive: vi.fn(),
   };
 
   let controller: ClassTypesController;
@@ -24,6 +25,7 @@ describe('ClassTypesController', () => {
     classTypesServiceMock.findAll.mockReset();
     classTypesServiceMock.create.mockReset();
     classTypesServiceMock.update.mockReset();
+    classTypesServiceMock.archive.mockReset();
 
     // Guards are bypassed: tests call controller methods directly.
     const module: TestingModule = await Test.createTestingModule({
@@ -104,6 +106,31 @@ describe('ClassTypesController', () => {
         dto,
       );
       expect(result).toBe(updated);
+    });
+  });
+
+  describe('POST /partner/class-types/:id/archive', () => {
+    it('archives with the verified partner id and the path id', async () => {
+      const id = '44444444-4444-4444-8444-444444444444';
+      const archived = { id, isActive: false };
+      classTypesServiceMock.archive.mockResolvedValue(archived);
+
+      const result = await controller.archive(PARTNER, id);
+
+      expect(classTypesServiceMock.archive).toHaveBeenCalledWith(
+        PARTNER.partnerId,
+        id,
+      );
+      expect(result).toBe(archived);
+    });
+
+    it('responds 200, not 201', () => {
+      expect(
+        Reflect.getMetadata(
+          '__httpCode__',
+          ClassTypesController.prototype.archive,
+        ),
+      ).toBe(200);
     });
   });
 });
