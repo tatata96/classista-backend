@@ -79,7 +79,8 @@ Full interactive docs (Swagger UI) are served at `/api/docs` when the app is run
 
 ```http
 GET /                 # Health check style root route
-GET /categories        # Public: list categories and their subcategories
+GET /categories        # Public: the full category hierarchy (parents with their subcategories).
+                        # No search filter; the frontend filters the result locally.
 GET /auth/me           # Requires "Authorization: Bearer <Supabase access token>"
                         # Returns the authenticated user's Classista profile,
                         # creating their Classista User record on first sight,
@@ -87,7 +88,19 @@ GET /auth/me           # Requires "Authorization: Bearer <Supabase access token>
                         # Inactive partners are still returned. MVP rule is one partner per
                         # user but the DB doesn't enforce it yet: if there are several,
                         # the oldest membership is returned.
+
+# Partner Class Types. Require a Bearer token and a partner membership; the
+# partner is always taken from the membership, never from the request.
+GET   /partner/class-types?isActive=true|false   # Active by default; false = archived
+POST  /partner/class-types                       # Create (categoryId must be a leaf category)
+PATCH /partner/class-types/:id                   # Edit name, categoryId, description (409 if archived)
+POST  /partner/class-types/:id/archive           # Archive; idempotent, keeps plans and sessions
 ```
+
+Design decisions for Class Types are recorded in
+[docs/specs/0002-partner-class-types.md](docs/specs/0002-partner-class-types.md).
+Creating a Class Plan must reject archived Class Types, but that rule is **not
+implemented yet** because Class Plans do not exist yet.
 
 ## Project Structure
 
@@ -98,6 +111,7 @@ src/
   main.ts                 Application bootstrap, Swagger setup
   auth/                   Supabase token verification, the auth guard, GET /auth/me
   categories/             Public category browsing
+  class-types/            Partner Class Type management (list, create, edit, archive)
   lib/database/           PrismaService, the app's database connection
   config/                 Environment variable validation
   common/filters/         Global exception handling
@@ -109,7 +123,7 @@ test/
 
 - Partner and studio authorization (scoping dashboard access to the authenticated partner)
 - Partner and venue management
-- Class plans and session generation
+- Class plans and session generation (must only accept active Class Types)
 - Booking and credit management
 - SMTP provider for Supabase's transactional email (confirmation, password reset), before real user onboarding
 
