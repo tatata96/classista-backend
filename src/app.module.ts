@@ -8,6 +8,7 @@ import { validateEnv } from './config/env.validation.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PartnersModule } from './partners/partners.module.js';
 import { VenuesModule } from './venues/venues.module.js';
+import { ClassTypesModule } from './class-types/class-types.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { VenuesModule } from './venues/venues.module.js';
     AuthModule,
     PartnersModule,
     VenuesModule,
+    ClassTypesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
