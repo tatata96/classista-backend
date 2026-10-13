@@ -1,5 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../lib/database/prisma.service.js';
 import { ClassTypesService } from './class-types.service.js';
 
@@ -10,6 +15,8 @@ describe('ClassTypesService', () => {
     classType: {
       findMany: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
     },
     category: {
       findUnique: vi.fn(),
@@ -21,6 +28,8 @@ describe('ClassTypesService', () => {
   beforeEach(async () => {
     prismaMock.classType.findMany.mockReset();
     prismaMock.classType.create.mockReset();
+    prismaMock.classType.findFirst.mockReset();
+    prismaMock.classType.update.mockReset();
     prismaMock.category.findUnique.mockReset();
 
     const module = await Test.createTestingModule({
@@ -145,6 +154,164 @@ describe('ClassTypesService', () => {
         BadRequestException,
       );
       expect(prismaMock.classType.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    const CLASS_TYPE_ID = '44444444-4444-4444-8444-444444444444';
+    const CATEGORY_ID = '33333333-3333-4333-8333-333333333333';
+
+    function givenActiveClassType() {
+      prismaMock.classType.findFirst.mockResolvedValue({ isActive: true });
+    }
+
+    it('updates an active type owned by the partner', async () => {
+      givenActiveClassType();
+      const updated = { id: CLASS_TYPE_ID, name: 'New name' };
+      prismaMock.classType.update.mockResolvedValue(updated);
+
+      const result = await service.update(PARTNER_ID, CLASS_TYPE_ID, {
+        name: 'New name',
+      });
+
+      expect(prismaMock.classType.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: CLASS_TYPE_ID, partnerId: PARTNER_ID },
+        }),
+      );
+      expect(prismaMock.classType.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: CLASS_TYPE_ID, partnerId: PARTNER_ID, isActive: true },
+          data: { name: 'New name' },
+        }),
+      );
+      expect(result).toBe(updated);
+    });
+
+    it('returns 409 when the type is archived between the check and the write', async () => {
+      givenActiveClassType();
+      prismaMock.classType.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Record not found', {
+          code: 'P2025',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { name: 'New name' }),
+      ).rejects.toThrow(
+        new ConflictException('Archived Class Types cannot be edited.'),
+      );
+    });
+
+    it('rethrows other database errors untouched', async () => {
+      givenActiveClassType();
+      const failure = new Error('connection lost');
+      prismaMock.classType.update.mockRejectedValue(failure);
+
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { name: 'New name' }),
+      ).rejects.toBe(failure);
+    });
+
+    it('returns 404 for a type that does not exist or belongs to another partner', async () => {
+      prismaMock.classType.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { name: 'New name' }),
+      ).rejects.toThrow(new NotFoundException('Class Type not found'));
+      expect(prismaMock.classType.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 for an archived type and changes nothing', async () => {
+      prismaMock.classType.findFirst.mockResolvedValue({ isActive: false });
+
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { name: 'New name' }),
+      ).rejects.toThrow(
+        new ConflictException('Archived Class Types cannot be edited.'),
+      );
+      expect(prismaMock.classType.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for an empty body before touching the database', async () => {
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, {}),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.classType.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('treats a body of only undefined fields as empty', async () => {
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { name: undefined }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('clears the description when it is null', async () => {
+      givenActiveClassType();
+      prismaMock.classType.update.mockResolvedValue({});
+
+      await service.update(PARTNER_ID, CLASS_TYPE_ID, { description: null });
+
+      expect(prismaMock.classType.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { description: null } }),
+      );
+    });
+
+    it('accepts a new leaf category', async () => {
+      givenActiveClassType();
+      prismaMock.category.findUnique.mockResolvedValue({
+        _count: { children: 0 },
+      });
+      prismaMock.classType.update.mockResolvedValue({});
+
+      await service.update(PARTNER_ID, CLASS_TYPE_ID, {
+        categoryId: CATEGORY_ID,
+      });
+
+      expect(prismaMock.classType.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { categoryId: CATEGORY_ID } }),
+      );
+    });
+
+    it('rejects an unknown category with 400', async () => {
+      givenActiveClassType();
+      prismaMock.category.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { categoryId: CATEGORY_ID }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.classType.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a parent category with 400', async () => {
+      givenActiveClassType();
+      prismaMock.category.findUnique.mockResolvedValue({
+        _count: { children: 31 },
+      });
+
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { categoryId: CATEGORY_ID }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.classType.update).not.toHaveBeenCalled();
+    });
+
+    it('does not check categories when categoryId is not being changed', async () => {
+      givenActiveClassType();
+      prismaMock.classType.update.mockResolvedValue({});
+
+      await service.update(PARTNER_ID, CLASS_TYPE_ID, { name: 'New name' });
+
+      expect(prismaMock.category.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('reports an archived type before validating its category', async () => {
+      prismaMock.classType.findFirst.mockResolvedValue({ isActive: false });
+
+      await expect(
+        service.update(PARTNER_ID, CLASS_TYPE_ID, { categoryId: CATEGORY_ID }),
+      ).rejects.toThrow(ConflictException);
+      expect(prismaMock.category.findUnique).not.toHaveBeenCalled();
     });
   });
 });

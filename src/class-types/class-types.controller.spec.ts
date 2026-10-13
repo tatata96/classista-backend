@@ -15,6 +15,7 @@ describe('ClassTypesController', () => {
   const classTypesServiceMock = {
     findAll: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
   };
 
   let controller: ClassTypesController;
@@ -22,6 +23,7 @@ describe('ClassTypesController', () => {
   beforeEach(async () => {
     classTypesServiceMock.findAll.mockReset();
     classTypesServiceMock.create.mockReset();
+    classTypesServiceMock.update.mockReset();
 
     // Guards are bypassed: tests call controller methods directly.
     const module: TestingModule = await Test.createTestingModule({
@@ -84,6 +86,24 @@ describe('ClassTypesController', () => {
         dto,
       );
       expect(result).toBe(created);
+    });
+  });
+
+  describe('PATCH /partner/class-types/:id', () => {
+    it('updates with the verified partner id, the path id and the dto', async () => {
+      const id = '44444444-4444-4444-8444-444444444444';
+      const dto = { name: 'New name' };
+      const updated = { id };
+      classTypesServiceMock.update.mockResolvedValue(updated);
+
+      const result = await controller.update(PARTNER, id, dto);
+
+      expect(classTypesServiceMock.update).toHaveBeenCalledWith(
+        PARTNER.partnerId,
+        id,
+        dto,
+      );
+      expect(result).toBe(updated);
     });
   });
 });

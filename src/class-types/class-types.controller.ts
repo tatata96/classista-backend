@@ -1,9 +1,21 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -15,6 +27,7 @@ import type { PartnerContext } from '../partners/types/partner-context.js';
 import { ClassTypesService } from './class-types.service.js';
 import { ClassTypeResponseDto } from './dto/class-type-response.dto.js';
 import { CreateClassTypeDto } from './dto/create-class-type.dto.js';
+import { UpdateClassTypeDto } from './dto/update-class-type.dto.js';
 import { FindClassTypesQueryDto } from './dto/find-class-types-query.dto.js';
 
 // "/partner/..." has no :partnerId: PartnerAccessGuard resolves the partner
@@ -58,5 +71,26 @@ export class ClassTypesController {
     @Body() dto: CreateClassTypeDto,
   ): Promise<ClassTypeResponseDto> {
     return this.classTypesService.create(partner.partnerId, dto);
+  }
+
+  @Patch(':id')
+  @ApiOkResponse({
+    description: 'Updates the class type',
+    type: ClassTypeResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid or empty body, malformed id, or categoryId is unknown or not a leaf category',
+  })
+  @ApiNotFoundResponse({ description: 'No such class type for this partner' })
+  @ApiConflictResponse({
+    description: 'Archived Class Types cannot be edited.',
+  })
+  update(
+    @CurrentPartner() partner: PartnerContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateClassTypeDto,
+  ): Promise<ClassTypeResponseDto> {
+    return this.classTypesService.update(partner.partnerId, id, dto);
   }
 }

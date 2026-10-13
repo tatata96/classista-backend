@@ -1,6 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../lib/database/prisma.service.js';
 import { CreateClassTypeDto } from './dto/create-class-type.dto.js';
+import { UpdateClassTypeDto } from './dto/update-class-type.dto.js';
 import { ClassTypeResponseDto } from './dto/class-type-response.dto.js';
 
 // Everything except partnerId and imageUrl (image management is deferred).
@@ -46,6 +53,58 @@ export class ClassTypesService {
       data: { ...dto, partnerId },
       select: CLASS_TYPE_SELECT,
     });
+  }
+
+  async update(
+    partnerId: string,
+    classTypeId: string,
+    dto: UpdateClassTypeDto,
+  ): Promise<ClassTypeResponseDto> {
+    // With whitelist + transform, absent fields can still exist as undefined.
+    if (Object.values(dto).every((value) => value === undefined)) {
+      throw new BadRequestException('Provide at least one field to update');
+    }
+
+    const classType = await this.prisma.classType.findFirst({
+      where: { id: classTypeId, partnerId },
+      select: { isActive: true },
+    });
+
+    // Another partner's type gets the exact same 404 as a type that doesn't
+    // exist, so a caller can never tell the two apart.
+    if (!classType) {
+      throw new NotFoundException('Class Type not found');
+    }
+
+    // Archived types are read-only. The type exists, but its current state
+    // conflicts with the edit, hence 409 rather than 404 or 400.
+    if (!classType.isActive) {
+      throw new ConflictException('Archived Class Types cannot be edited.');
+    }
+
+    if (dto.categoryId !== undefined) {
+      await this.assertLeafCategory(dto.categoryId);
+    }
+
+    // isActive: true makes the write itself refuse an archived row, so a
+    // request that archives this type between the check above and this update
+    // cannot be overtaken. Prisma then reports "record not found" (P2025),
+    // which we translate to the same 409 the check above gives.
+    try {
+      return await this.prisma.classType.update({
+        where: { id: classTypeId, partnerId, isActive: true },
+        data: dto,
+        select: CLASS_TYPE_SELECT,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new ConflictException('Archived Class Types cannot be edited.');
+      }
+      throw error;
+    }
   }
 
   // Categories are shared reference data, so there is no partner check here.
