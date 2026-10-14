@@ -11,6 +11,7 @@ import { PartnersModule } from './partners/partners.module.js';
 import { VenuesModule } from './venues/venues.module.js';
 import { ClassTypesModule } from './class-types/class-types.module.js';
 import { ClassPlansModule } from './class-plans/class-plans.module.js';
+import { ClassSessionsModule } from './class-sessions/class-sessions.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ClassPlansModule } from './class-plans/class-plans.module.js';
     VenuesModule,
     ClassTypesModule,
     ClassPlansModule,
+    ClassSessionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

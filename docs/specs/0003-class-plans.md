@@ -20,6 +20,7 @@ Related: [0002 Partner Class Types](0002-partner-class-types.md).
 - `POST /partner/class-plans`: creation rules, partner scoping, active Class Type / venue / instructor checks (this finishes the follow-up from spec 0002), one-time "must start in the future", title copied from the Class Type, and plan plus first sessions saved in one transaction.
 - `GET /partner/class-plans`: the partner's plans, dates as `YYYY-MM-DD` and times as `HH:mm`.
 - Session generation: one session for a one-time plan; the rolling 30-day window for recurring plans; idempotent; paused plans generate nothing.
+- `GET /partner/class-sessions?date=YYYY-MM-DD`: the partner's already-generated sessions for one Istanbul day (see Listing sessions). Read-only.
 - Daily job (03:00 Istanbul, `@nestjs/schedule`) and a startup catch-up, each plan isolated so one failure does not stop the others.
 
 **Deferred to later PRs** (specified below, not built)
@@ -162,6 +163,36 @@ A partner may edit the capacity of a single session directly. Session time still
 
 `GET /partner/class-plans` lists the authenticated partner's plans, so the frontend can show them and prefill a duplicate. It is in the first PR.
 
+## Listing sessions
+
+`GET /partner/class-sessions?date=YYYY-MM-DD` feeds the partner dashboard's Schedule page. Module: `src/class-sessions/`. Guards: `SupabaseAuthGuard` then `PartnerAccessGuard`; the partner comes from `@CurrentPartner()`, never from the request.
+
+- **`date` is required** and must be a real calendar date (`2026-02-30` is rejected). Anything else returns 400 through the global validation pipe.
+- **The day is read in `Europe/Istanbul`** (`VENUE_TIMEZONE`, the Turkey-only MVP). The service converts local midnight of `date` and of the next day to UTC with `zonedDateTimeToInstant`. Sessions match when `dayStart <= startAt < nextDayStart` (inclusive start, exclusive next-day start). The session's `startAt` decides, not its `endAt`, so a session that ends at midnight belongs to the day it starts.
+- **Partner scoping** goes through the existing relations: `classPlan.classType.partnerId`, the same ownership path as plan listing.
+- **Order:** `startAt` ascending, then `id` ascending (stable for sessions that start together).
+- **Read-only:** only already-generated sessions are returned. The request never runs generation, so days beyond the rolling window are simply empty.
+- **Nothing is filtered by status:** `SCHEDULED`, `CANCELLED`, and `COMPLETED` sessions come back as stored, and the plan's status (for example `PAUSED`) is ignored. The frontend decides what to show.
+- **No booking data:** the response has capacities only. Booking counts and remaining seats are not returned and not invented; they arrive with the booking feature.
+- An empty day returns `200 []`.
+
+Response (array of objects):
+
+| Field                                | Type           | Notes                                                |
+| ------------------------------------ | -------------- | ---------------------------------------------------- |
+| `id`, `classPlanId`, `venueId`       | string (UUID)  |                                                      |
+| `instructorId`                       | string \| null | The session's own instructor                         |
+| `startAt`, `endAt`                   | string         | ISO 8601 UTC, for example `2026-10-14T15:00:00.000Z` |
+| `totalCapacity`, `classistaCapacity` | integer        | Copied onto the session at generation                |
+| `status`                             | enum           | `SCHEDULED` \| `CANCELLED` \| `COMPLETED`            |
+| `title`                              | string         | The class plan's title                               |
+| `description`                        | string \| null | The class plan's description                         |
+| `categoryId`                         | string (UUID)  | The class type's category                            |
+| `venueName`                          | string         |                                                      |
+| `instructorName`                     | string \| null | `null` when there is no instructor                   |
+
+Errors: 400 invalid or missing `date`; 401 missing or invalid token; 403 not a partner member or partner inactive.
+
 ## Data model impact
 
 `ClassPlan` and `ClassSession` replace the single `capacity` column with `totalCapacity` and `classistaCapacity`. `ClassPlan` replaces `endTime` with `durationMinutes`. The migration must handle existing rows explicitly: it never invents total capacities and never resets the database. If a table has rows it cannot migrate reliably, the migration fails with a clear message instead of guessing (when written, all three tables were empty). Later PRs add: per-field capacity override flags (total and Classista), and `cancelledById`, `cancelledAt`, and `cancellationSource` beside the existing free-text `cancelledReason` (see Session generation). `cancelledById` references `User`.
@@ -201,6 +232,7 @@ It comes from the original NestJS scaffold (commit `94d2c3e`). `supertest` 7.2.2
 
 ## Follow-up
 
+- [ ] Add HTTP end-to-end tests for `/partner/class-sessions` with a real partner token (the route is covered by unit and real-database tests, not through authentication).
 - [ ] Fix the `supertest/types` import in `test/app.e2e-spec.ts` so `tsc --noEmit` is clean.
 - [ ] Add HTTP end-to-end tests for `/partner/class-plans` with a real partner token.
 - [ ] Optional helper: a `docker-compose` file or npm script that starts the test database in one command (approved, not required for this PR).
