@@ -39,7 +39,6 @@ const ONBOARDING_VENUE_SELECT = {
   latitude: true,
   longitude: true,
   phone: true,
-  timezone: true,
   amenityIds: true,
   createdAt: true,
   updatedAt: true,

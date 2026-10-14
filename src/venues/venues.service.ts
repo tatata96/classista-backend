@@ -8,8 +8,10 @@ import { PrismaService } from '../lib/database/prisma.service.js';
 import { CreateVenueDto } from './dto/create-venue.dto.js';
 import { UpdateVenueDto } from './dto/update-venue.dto.js';
 import { VenueResponseDto } from './dto/venue-response.dto.js';
+import { VENUE_TIMEZONE } from './venue-timezone.js';
 
-// Everything except partnerId: clients never need it, and it keeps the shape explicit.
+// Everything except partnerId and timezone: clients never need them (the
+// timezone is always VENUE_TIMEZONE and stays internal), and it keeps the shape explicit.
 const VENUE_SELECT = {
   id: true,
   name: true,
@@ -21,7 +23,6 @@ const VENUE_SELECT = {
   latitude: true,
   longitude: true,
   phone: true,
-  timezone: true,
   amenityIds: true,
   createdAt: true,
   updatedAt: true,
@@ -42,10 +43,11 @@ export class VenuesService {
     });
   }
 
-  // status is not in the DTO, so the schema default (ACTIVE) applies.
+  // status is not in the DTO, so the schema default (ACTIVE) applies. The
+  // timezone is never client input; it is always VENUE_TIMEZONE.
   create(partnerId: string, dto: CreateVenueDto): Promise<VenueResponseDto> {
     return this.prisma.venue.create({
-      data: { ...dto, partnerId },
+      data: { ...dto, partnerId, timezone: VENUE_TIMEZONE },
       select: VENUE_SELECT,
     });
   }

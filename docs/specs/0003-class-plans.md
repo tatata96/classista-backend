@@ -28,10 +28,12 @@ Related: [0002 Partner Class Types](0002-partner-class-types.md).
   - A recurring plan starting today skips occurrences whose start time has already passed.
 - **Same-day sessions only.** Every session starts and finishes on the same calendar day, for one-time and recurring plans alike.
 - All times are interpreted in the **Venue's timezone** (`Venue.timezone`, IANA).
-- **MVP supports only `Europe/Istanbul` venues.** Venue creation and update must reject any other timezone (today `IsIanaTimezone` accepts any valid IANA zone, and onboarding already hard-codes `Europe/Istanbul`). Session generation reads the venue's timezone rather than assuming Istanbul, so lifting the restriction later needs no generation change.
-  - Existing data was checked read-only: both current venues are `Europe/Istanbul`, so the restriction needs no data fix. If a future check finds another timezone, flag it; never silently rewrite it.
+- **MVP supports only `Europe/Istanbul` venues, and clients never send a timezone.**
+  - `timezone` is removed from the venue create and update request DTOs. A request that includes it returns 400 through the global validation pipe (`forbidNonWhitelisted`).
+  - The backend sets `Europe/Istanbul` itself when a venue is created (`VENUE_TIMEZONE`). Onboarding already did this and is unchanged.
+  - `Venue.timezone` stays in the database but is **not exposed** in venue or onboarding API responses (every venue is Istanbul, so clients gain nothing). Session generation reads it from the venue rather than assuming Istanbul, so supporting other regions later needs no generation change.
+  - Existing data was checked read-only: both current venues are `Europe/Istanbul`. If a future check finds another timezone, flag it; never silently rewrite it.
   - **Daylight saving handling for other timezones is deferred** until venues outside Turkey are supported.
-  - Not yet implemented: the venue validation change is a code task for the implementation step, not part of this spec-only task.
 
 ### Duration
 
