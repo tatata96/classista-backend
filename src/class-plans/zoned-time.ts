@@ -1,11 +1,17 @@
-// Time helpers for Class Plans. A plan stores local wall-clock values (a date
-// and a start time at the venue); a session stores an exact instant. These
-// functions convert between the two using Intl, so no date library is needed.
+// Date and time helpers for Class Plans. A plan stores local wall-clock values
+// (a date and a start time at the venue); a session stores an exact instant.
+// Everything here uses Intl and plain Date maths, so no date library is needed.
 //
 // Dates are plain 'YYYY-MM-DD' strings and times are 'HH:mm' strings, both
-// meaning "as shown on the venue's wall clock". Daylight saving edge cases
-// (a local time that does not exist or happens twice) are NOT handled: MVP
-// venues are all Europe/Istanbul, which has no daylight saving (spec 0003).
+// meaning "as shown on the venue's wall clock". The file has four groups:
+//   1. Checking text: is it a real date / a valid time?
+//   2. Database columns: converting that text to and from Prisma's Date values.
+//   3. Wall clock <-> instant: using the venue's timezone.
+//   4. Calendar maths: adding days, finding the ISO weekday.
+//
+// Daylight saving edge cases (a local time that does not exist or happens
+// twice) are NOT handled: MVP venues are all Europe/Istanbul, which has no
+// daylight saving (spec 0003).
 
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
@@ -86,6 +92,32 @@ function getOffsetMs(instantMs: number, timeZone: string): number {
 
   // Drop sub-second precision so it does not leak into the offset.
   return wallClockAsUtc - Math.floor(instantMs / 1000) * 1000;
+}
+
+// Prisma hands a @db.Date column back as a Date at UTC midnight, and a
+// @db.Time column as a Date on 1970-01-01. These four functions convert between
+// those Date values and the 'YYYY-MM-DD' / 'HH:mm' text used in requests.
+
+/** 'YYYY-MM-DD' to the Date Prisma stores in a @db.Date column. */
+export function localDateToDbDate(localDate: string): Date {
+  parseLocalDate(localDate); // throws for anything that is not a real date
+  return new Date(`${localDate}T00:00:00.000Z`);
+}
+
+/** 'HH:mm' to the Date Prisma stores in a @db.Time column. */
+export function localTimeToDbTime(localTime: string): Date {
+  parseLocalTime(localTime); // throws for anything that is not a time
+  return new Date(`1970-01-01T${localTime}:00.000Z`);
+}
+
+/** A @db.Date column value back to 'YYYY-MM-DD'. */
+export function dbDateToLocalDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** A @db.Time column value back to 'HH:mm'. */
+export function dbTimeToLocalTime(time: Date): string {
+  return time.toISOString().slice(11, 16);
 }
 
 /** The exact instant at which the venue's wall clock shows this date and time. */

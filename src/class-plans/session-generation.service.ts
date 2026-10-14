@@ -5,6 +5,8 @@ import { PrismaService } from '../lib/database/prisma.service.js';
 import {
   addDaysToLocalDate,
   addMinutes,
+  dbDateToLocalDate,
+  dbTimeToLocalTime,
   getIsoWeekday,
   instantToLocalDate,
   zonedDateTimeToInstant,
@@ -18,12 +20,6 @@ const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export type PlanForGeneration = Prisma.ClassPlanGetPayload<{
   include: { venue: { select: { timezone: true } } };
 }>;
-
-// Prisma hands a @db.Date column back as a Date at UTC midnight, and a
-// @db.Time column as a Date on 1970-01-01. Read them back as the 'YYYY-MM-DD'
-// and 'HH:mm' text the plan was created with.
-const toLocalDate = (date: Date): string => date.toISOString().slice(0, 10);
-const toLocalTime = (time: Date): string => time.toISOString().slice(11, 16);
 
 interface GenerationOptions {
   db?: Prisma.TransactionClient;
@@ -51,7 +47,7 @@ export class SessionGenerationService {
     const startTimes =
       plan.recurrenceType === RecurrenceType.RECURRING
         ? this.getRecurringStartTimes(plan, now)
-        : [this.getStartTime(plan, toLocalDate(plan.startDate))];
+        : [this.getStartTime(plan, dbDateToLocalDate(plan.startDate))];
 
     if (startTimes.length === 0) {
       return 0;
@@ -79,7 +75,7 @@ export class SessionGenerationService {
   private getStartTime(plan: PlanForGeneration, localDate: string): Date {
     return zonedDateTimeToInstant(
       localDate,
-      toLocalTime(plan.startTime),
+      dbTimeToLocalTime(plan.startTime),
       plan.venue.timezone,
     );
   }
@@ -93,13 +89,13 @@ export class SessionGenerationService {
     const timeZone = plan.venue.timezone;
 
     // 'YYYY-MM-DD' strings sort chronologically, so max/min are plain comparisons.
-    const planStart = toLocalDate(plan.startDate);
+    const planStart = dbDateToLocalDate(plan.startDate);
     const today = instantToLocalDate(now, timeZone);
     const firstDate = planStart > today ? planStart : today;
 
     const windowLastDate = instantToLocalDate(windowEnd, timeZone);
     // The end date is inclusive, so a plan ending today still counts today.
-    const planEnd = plan.endDate ? toLocalDate(plan.endDate) : null;
+    const planEnd = plan.endDate ? dbDateToLocalDate(plan.endDate) : null;
     const lastDate =
       planEnd && planEnd < windowLastDate ? planEnd : windowLastDate;
 

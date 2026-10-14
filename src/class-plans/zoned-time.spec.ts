@@ -1,10 +1,14 @@
 import {
   addDaysToLocalDate,
   addMinutes,
+  dbDateToLocalDate,
+  dbTimeToLocalTime,
   getIsoWeekday,
   instantToLocalDate,
   isValidLocalDate,
   isValidLocalTime,
+  localDateToDbDate,
+  localTimeToDbTime,
   localTimeToMinutes,
   zonedDateTimeToInstant,
 } from './zoned-time.js';
@@ -125,5 +129,26 @@ describe('isValidLocalTime and localTimeToMinutes', () => {
   it('counts minutes since midnight', () => {
     expect(localTimeToMinutes('00:00')).toBe(0);
     expect(localTimeToMinutes('18:30')).toBe(1110);
+  });
+});
+
+describe('database date and time columns', () => {
+  it('round-trips a date through the @db.Date representation', () => {
+    const column = localDateToDbDate('2026-10-14');
+
+    expect(column.toISOString()).toBe('2026-10-14T00:00:00.000Z');
+    expect(dbDateToLocalDate(column)).toBe('2026-10-14');
+  });
+
+  it('round-trips a time through the @db.Time representation', () => {
+    const column = localTimeToDbTime('18:30');
+
+    expect(column.toISOString()).toBe('1970-01-01T18:30:00.000Z');
+    expect(dbTimeToLocalTime(column)).toBe('18:30');
+  });
+
+  it('rejects text that is not a real date or time', () => {
+    expect(() => localDateToDbDate('2026-02-30')).toThrow('Invalid local date');
+    expect(() => localTimeToDbTime('25:00')).toThrow('Invalid local time');
   });
 });
