@@ -1,7 +1,7 @@
 # 0003. Class Plans
 
 **Date**: 2026-10-14
-**Status**: Draft (all questions resolved; awaiting review; nothing implemented, Prisma schema not yet changed)
+**Status**: Accepted (first PR in progress: plan creation, listing, and session generation)
 
 ## Summary
 
@@ -11,13 +11,16 @@ A Class Plan is a partner's schedule for one Class Type at one Venue: either a s
 
 ## Implementation scope
 
-The first PR builds only **plan creation and session generation** (creation rules, capacity, the rolling window, idempotent generation, the daily job, and the venue and Class Type checks). Editing, pausing, closing, cancellation, and single-session capacity edits are specified below but **deferred to later PRs**. Booking endpoints and the booking-window check are also later. Schema fields needed only by deferred features (override flags, cancellation fields) are added in the PR that builds them.
+The first PR builds only **plan creation and session generation** (creation rules, capacity, the rolling window, idempotent generation, the daily job, and the venue and Class Type checks). Plan creation, listing, and session generation are in scope. Editing, pausing, closing, cancellation, and single-session capacity edits are specified below but **deferred to later PRs**. Booking endpoints and the booking-window check are also later. Schema fields needed only by deferred features (override flags, cancellation fields) are added in the PR that builds them.
 
 Related: [0002 Partner Class Types](0002-partner-class-types.md).
 
 ## Creating a plan
 
 - A plan is `ONE_TIME` or `RECURRING`. Recurring plans have `weekdays` and a start date, and an **optional** end date (without one, the plan runs open-ended; generation is still limited to the rolling window).
+- **Weekdays use ISO numbers:** 1 = Monday through 7 = Sunday (documented in Swagger). Recurring plans require at least one; duplicates are rejected; one-time plans have none.
+- **End dates are inclusive:** a plan ending today still generates today's remaining occurrences.
+- **The plan's title is derived from the selected Class Type's name at creation.** The request has no title input, and renaming the Class Type later does not change the plan's title.
 - The Class Type must be **active**. Archived Class Types are rejected (the follow-up promised in spec 0002; needs a test).
 - The partner always comes from the authenticated membership, never from the request. Class Type, Venue, and Instructor must belong to that partner.
 - **Creating for today is allowed.**
@@ -34,7 +37,7 @@ Related: [0002 Partner Class Types](0002-partner-class-types.md).
 
 - The backend accepts any duration in **positive whole minutes**. Presets are a frontend convenience only; the backend has no preset list.
 - The session must finish **by midnight**: ending exactly at 00:00 is allowed (for example 23:00 plus 60 minutes). Ending after midnight (for example 00:30) is rejected, because sessions are same-day.
-- Implementation note: a session ending at midnight has an `endAt` of 00:00 on the following date, and the plan's `endTime` of `00:00` must be read as end of day, not as earlier than the start time. Validate on start time plus duration, not by comparing `endTime` to `startTime`.
+- The plan stores `startTime` and `durationMinutes` (there is no `endTime` column, because an end of `00:00` is ambiguous). A session's `endAt` is `startAt` plus the duration, so a session ending at midnight has an `endAt` of 00:00 on the following date. Validate on start time plus duration <= 24:00.
 
 ### Capacity
 
@@ -55,10 +58,15 @@ A recurring plan defines a schedule. It does not create every session up to its 
 
 - Sessions are generated within a **rolling 30-day window**. The window is defined on instants: a session qualifies if `now < startAt <= now + 30 × 24 hours`. Generation and the booking check use this same definition. The Venue timezone only determines a session's actual start instant; it does not shift the window.
 - Generation runs when a plan is **created or edited**, and a **daily scheduled job** extends the window for active plans.
-- A one-time plan immediately creates exactly one session.
+- A one-time plan immediately creates exactly one session, **even if it starts beyond the 30-day window**. The window applies to recurring generation only.
+- **End dates are inclusive**, so the daily job includes plans ending today.
+- **Startup catch-up:** the app also runs generation once at startup, in addition to the daily job, so downtime does not leave a gap.
+- **Each plan's generation is isolated** (its own transaction), so one failure does not stop the others.
+- Plan creation and its first session generation run in **one database transaction**: if generation fails, the plan is not created. The daily job generates in its own per-plan transactions.
 - **Paused plans do not generate sessions.**
 - Customers can book only sessions starting within the same window (after now, no later than 30 × 24 hours from now), and **the backend enforces it**.
 - The daily job uses `@nestjs/schedule`, an approved new dependency (added at implementation time, not yet installed).
+- Verification of transaction rollback and duplicate prevention must run against a real test database; mocked Prisma cannot prove them.
 - **Generation is idempotent.** It checks which sessions already exist and creates only the missing ones. The existing `@@unique([classPlanId, startAt])` on Class Session is the safety net, so a repeated or concurrent run cannot create duplicates.
 - **Why a session was cancelled decides whether generation may bring it back.** The unique key only prevents duplicates; it does not decide this behavior.
   - **Cancelled explicitly** (partner cancels the session or one-time class): it stays cancelled. Generation never recreates or restores it.
@@ -131,6 +139,10 @@ A partner may edit the capacity of a single session directly. Session time still
 - The positive-whole-number rule and Classista capacity <= total capacity apply as on plans.
 - The partner is taken from the authenticated membership and the session must belong to that partner's plan.
 
-## Data model impact (not applied yet)
+## Listing plans
 
-Current `ClassPlan` and `ClassSession` have one `capacity` column. This spec needs two (total and Classista) on both models, decided. Sessions gain per-field capacity override flags (total and Classista), and `cancelledById`, `cancelledAt`, and `cancellationSource` beside the existing free-text `cancelledReason` (see Session generation). `cancelledById` references `User`.
+`GET /partner/class-plans` lists the authenticated partner's plans, so the frontend can show them and prefill a duplicate. It is in the first PR.
+
+## Data model impact
+
+`ClassPlan` and `ClassSession` replace the single `capacity` column with `totalCapacity` and `classistaCapacity`. `ClassPlan` replaces `endTime` with `durationMinutes`. The migration must handle existing rows explicitly: it never invents total capacities and never resets the database. If a table has rows it cannot migrate reliably, the migration fails with a clear message instead of guessing (when written, all three tables were empty). Later PRs add: per-field capacity override flags (total and Classista), and `cancelledById`, `cancelledAt`, and `cancellationSource` beside the existing free-text `cancelledReason` (see Session generation). `cancelledById` references `User`.

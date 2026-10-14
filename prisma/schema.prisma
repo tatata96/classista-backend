@@ -276,11 +276,16 @@ model ClassPlan {
   recurrenceType RecurrenceType
   weekdays       Int[]
 
-  startTime DateTime @db.Time(0)
-  endTime   DateTime @db.Time(0)
+  // Local time at the venue. The end is startTime + durationMinutes (no
+  // endTime column: a midnight end of 00:00 would look earlier than the start).
+  startTime       DateTime @db.Time(0)
+  durationMinutes Int
 
-  capacity Int
-  status   ClassPlanStatus @default(ACTIVE)
+  // totalCapacity: everyone in the class, including bookings outside Classista.
+  // classistaCapacity: bookings accepted through Classista (<= totalCapacity).
+  totalCapacity     Int
+  classistaCapacity Int
+  status            ClassPlanStatus @default(ACTIVE)
 
   // PRISMA RELATIONS (not database columns)
   // The three IDs above are the actual foreign keys.
@@ -321,9 +326,11 @@ model ClassSession {
   startAt DateTime @db.Timestamptz(3)
   endAt   DateTime @db.Timestamptz(3)
 
-  capacity        Int
-  status          SessionStatus @default(SCHEDULED)
-  cancelledReason String?
+  // Copied from the ClassPlan when the session is generated.
+  totalCapacity     Int
+  classistaCapacity Int
+  status            SessionStatus @default(SCHEDULED)
+  cancelledReason   String?
 
   // PRISMA RELATIONS (not database columns)
   classPlan  ClassPlan   @relation(fields: [classPlanId], references: [id])
