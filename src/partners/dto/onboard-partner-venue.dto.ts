@@ -2,11 +2,8 @@ import { ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { CreateVenueDto } from '../../venues/dto/create-venue.dto.js';
 
-// timezone is intentionally excluded: Classista is Turkey-only for the MVP,
-// so onboarding sets it server-side (Europe/Istanbul) instead of asking the
-// client. Every other field keeps CreateVenueDto's exact validation.
+// : Classista is Turkey-only for the MVP: timezone is not a client field
 export class OnboardPartnerVenueDto extends OmitType(CreateVenueDto, [
-  'timezone',
   'name',
 ] as const) {
   // Optional here, unlike CreateVenueDto: asking for both a business name and

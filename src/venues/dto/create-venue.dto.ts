@@ -10,11 +10,11 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
-import { IsIanaTimezone } from '../../common/validators/is-iana-timezone.validator.js';
 import { VenueAmenity } from '../venue-amenity.js';
 
-// No partnerId and no status: the partner comes from the authenticated user,
-// and a new venue is always ACTIVE.
+// No partnerId, status, or timezone: the partner comes from the authenticated
+// user, a new venue is always ACTIVE
+// (Classista is Turkey-only for the MVP, use VENUE_TIMEZONE).
 export class CreateVenueDto {
   @ApiProperty({ example: 'Kadıköy Studio' })
   @IsString()
@@ -39,10 +39,6 @@ export class CreateVenueDto {
   @IsNotEmpty()
   @MaxLength(100)
   city: string;
-
-  @ApiProperty({ example: 'Europe/Istanbul', description: 'IANA timezone' })
-  @IsIanaTimezone()
-  timezone: string;
 
   @ApiPropertyOptional({ example: '34710' })
   @IsOptional()

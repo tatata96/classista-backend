@@ -33,9 +33,6 @@ export class VenueResponseDto {
   @ApiProperty({ type: String, nullable: true })
   phone: string | null;
 
-  @ApiProperty()
-  timezone: string;
-
   @ApiProperty({ enum: VenueAmenity, isArray: true })
   amenityIds: string[];
 
