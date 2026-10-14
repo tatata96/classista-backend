@@ -1,7 +1,10 @@
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { ClassPlanStatus, RecurrenceType } from '../generated/prisma/enums.js';
-import { PrismaService } from '../lib/database/prisma.service.js';
+import {
+  ClassPlanStatus,
+  RecurrenceType,
+} from '../../generated/prisma/enums.js';
+import { PrismaService } from '../../lib/database/prisma.service.js';
 import {
   PlanForGeneration,
   SessionGenerationService,

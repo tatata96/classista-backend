@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import {
   ClassPlanStatus,
   PartnerStatus,
   RecurrenceType,
-} from '../generated/prisma/enums.js';
-import { PrismaService } from '../lib/database/prisma.service.js';
+} from '../../generated/prisma/enums.js';
+import { PrismaService } from '../../lib/database/prisma.service.js';
 import {
   addDaysToLocalDate,
   addMinutes,
@@ -14,7 +14,7 @@ import {
   getIsoWeekday,
   instantToLocalDate,
   zonedDateTimeToInstant,
-} from './zoned-time.js';
+} from '../zoned-time.js';
 
 // Recurring plans only get sessions starting within the next 30 x 24 hours.
 const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;

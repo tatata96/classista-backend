@@ -4,7 +4,7 @@ import { VenueStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../lib/database/prisma.service.js';
 import { ClassPlansService } from './class-plans.service.js';
 import { CreateClassPlanDto } from './dto/create-class-plan.dto.js';
-import { SessionGenerationService } from './session-generation.service.js';
+import { SessionGenerationService } from './session-generation/session-generation.service.js';
 
 const PARTNER_ID = '11111111-1111-4111-8111-111111111111';
 const CLASS_TYPE_ID = '22222222-2222-4222-8222-222222222222';

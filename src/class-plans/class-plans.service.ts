@@ -4,7 +4,7 @@ import { RecurrenceType, VenueStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../lib/database/prisma.service.js';
 import { ClassPlanResponseDto } from './dto/class-plan-response.dto.js';
 import { CreateClassPlanDto } from './dto/create-class-plan.dto.js';
-import { SessionGenerationService } from './session-generation.service.js';
+import { SessionGenerationService } from './session-generation/session-generation.service.js';
 import {
   dbDateToLocalDate,
   dbTimeToLocalTime,

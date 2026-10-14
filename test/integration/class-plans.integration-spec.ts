@@ -8,7 +8,7 @@ import { CreateClassPlanDto } from '../../src/class-plans/dto/create-class-plan.
 import {
   PlanForGeneration,
   SessionGenerationService,
-} from '../../src/class-plans/session-generation.service.js';
+} from '../../src/class-plans/session-generation/session-generation.service.js';
 import {
   localDateToDbDate,
   localTimeToDbTime,

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { VENUE_TIMEZONE } from '../venues/venue-timezone.js';
+import { VENUE_TIMEZONE } from '../../venues/venue-timezone.js';
 import { SessionGenerationService } from './session-generation.service.js';
 
 // Decides WHEN generation runs; SessionGenerationService decides WHAT it does.
