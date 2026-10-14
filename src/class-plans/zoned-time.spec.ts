@@ -3,6 +3,9 @@ import {
   addMinutes,
   getIsoWeekday,
   instantToLocalDate,
+  isValidLocalDate,
+  isValidLocalTime,
+  localTimeToMinutes,
   zonedDateTimeToInstant,
 } from './zoned-time.js';
 
@@ -91,5 +94,36 @@ describe('getIsoWeekday', () => {
     expect(getIsoWeekday('2026-10-12')).toBe(1); // Monday
     expect(getIsoWeekday('2026-10-14')).toBe(3); // Wednesday
     expect(getIsoWeekday('2026-10-18')).toBe(7); // Sunday
+  });
+});
+
+describe('isValidLocalDate', () => {
+  it('accepts real calendar dates, including leap days', () => {
+    expect(isValidLocalDate('2026-10-14')).toBe(true);
+    expect(isValidLocalDate('2028-02-29')).toBe(true);
+  });
+
+  it('rejects impossible dates and other formats', () => {
+    expect(isValidLocalDate('2026-02-30')).toBe(false);
+    expect(isValidLocalDate('2027-02-29')).toBe(false);
+    expect(isValidLocalDate('2026-04-31')).toBe(false);
+    expect(isValidLocalDate('2026-13-01')).toBe(false);
+    expect(isValidLocalDate('2026-1-4')).toBe(false);
+    expect(isValidLocalDate('2026-10-14T00:00:00Z')).toBe(false);
+    expect(isValidLocalDate(20261014)).toBe(false);
+  });
+});
+
+describe('isValidLocalTime and localTimeToMinutes', () => {
+  it('accepts 00:00 through 23:59 only', () => {
+    expect(isValidLocalTime('00:00')).toBe(true);
+    expect(isValidLocalTime('23:59')).toBe(true);
+    expect(isValidLocalTime('24:00')).toBe(false);
+    expect(isValidLocalTime('9:00')).toBe(false);
+  });
+
+  it('counts minutes since midnight', () => {
+    expect(localTimeToMinutes('00:00')).toBe(0);
+    expect(localTimeToMinutes('18:30')).toBe(1110);
   });
 });

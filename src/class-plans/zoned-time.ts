@@ -13,12 +13,38 @@ const DAY_MS = 24 * 60 * MINUTE_MS;
 const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const LOCAL_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+/** True for a real calendar date written as 'YYYY-MM-DD' ('2026-02-30' is false). */
+export function isValidLocalDate(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const match = LOCAL_DATE_PATTERN.exec(value);
+  if (!match) return false;
+
+  const [year, month, day] = [
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+  ];
+  // Date.UTC rolls an impossible date over (Feb 30 -> Mar 2), so compare it back.
+  return formatLocalDate(Date.UTC(year, month - 1, day)) === value;
+}
+
+/** True for a 24-hour time written as 'HH:mm'. */
+export function isValidLocalTime(value: unknown): value is string {
+  return typeof value === 'string' && LOCAL_TIME_PATTERN.test(value);
+}
+
+/** Minutes since local midnight for an 'HH:mm' time. */
+export function localTimeToMinutes(localTime: string): number {
+  const [hour, minute] = parseLocalTime(localTime);
+  return hour * 60 + minute;
+}
+
 function parseLocalDate(localDate: string): [number, number, number] {
-  const match = LOCAL_DATE_PATTERN.exec(localDate);
-  if (!match) {
+  if (!isValidLocalDate(localDate)) {
     throw new Error(`Invalid local date: ${localDate}`);
   }
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
+  const [year, month, day] = localDate.split('-').map(Number);
+  return [year, month, day];
 }
 
 function parseLocalTime(localTime: string): [number, number] {
