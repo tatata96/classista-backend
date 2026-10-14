@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ClassPlanStatus, RecurrenceType } from '../generated/prisma/enums.js';
 import { PrismaService } from '../lib/database/prisma.service.js';
@@ -34,13 +35,17 @@ function buildPlan(
 }
 
 describe('SessionGenerationService', () => {
-  const prismaMock = { classSession: { createMany: vi.fn() } };
+  const prismaMock = {
+    classSession: { createMany: vi.fn() },
+    classPlan: { findMany: vi.fn() },
+  };
   const transactionClientMock = { classSession: { createMany: vi.fn() } };
 
   let service: SessionGenerationService;
 
   beforeEach(async () => {
     prismaMock.classSession.createMany.mockReset();
+    prismaMock.classPlan.findMany.mockReset();
     transactionClientMock.classSession.createMany.mockReset();
 
     const module = await Test.createTestingModule({
@@ -289,6 +294,86 @@ describe('SessionGenerationService', () => {
       );
 
       expect(created).toBe(0);
+      expect(prismaMock.classSession.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generateForActivePlans', () => {
+    const NOW = new Date('2026-10-14T09:00:00.000Z');
+
+    const recurringPlan = (id: string) =>
+      buildPlan({
+        id,
+        recurrenceType: RecurrenceType.RECURRING,
+        startDate: new Date('2026-10-01T00:00:00.000Z'),
+        weekdays: [3],
+      });
+
+    it('asks only for active recurring plans of active partners that have not ended', async () => {
+      prismaMock.classPlan.findMany.mockResolvedValue([]);
+
+      await service.generateForActivePlans(NOW);
+
+      expect(prismaMock.classPlan.findMany).toHaveBeenCalledWith({
+        where: {
+          status: ClassPlanStatus.ACTIVE,
+          recurrenceType: RecurrenceType.RECURRING,
+          // yesterday: a day of slack so a plan ending today is never missed
+          OR: [
+            { endDate: null },
+            { endDate: { gte: new Date('2026-10-13T09:00:00.000Z') } },
+          ],
+          classType: { partner: { status: 'ACTIVE' } },
+        },
+        include: { venue: { select: { timezone: true } } },
+      });
+    });
+
+    it('adds up the sessions created across plans', async () => {
+      prismaMock.classPlan.findMany.mockResolvedValue([
+        recurringPlan('plan-1'),
+        recurringPlan('plan-2'),
+      ]);
+      prismaMock.classSession.createMany.mockResolvedValue({ count: 4 });
+
+      const summary = await service.generateForActivePlans(NOW);
+
+      expect(summary).toEqual({ plans: 2, sessionsCreated: 8, failedPlans: 0 });
+      expect(prismaMock.classSession.createMany).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps going when one plan fails and reports it', async () => {
+      prismaMock.classPlan.findMany.mockResolvedValue([
+        recurringPlan('plan-1'),
+        recurringPlan('plan-2'),
+        recurringPlan('plan-3'),
+      ]);
+      prismaMock.classSession.createMany
+        .mockResolvedValueOnce({ count: 4 })
+        .mockRejectedValueOnce(new Error('database hiccup'))
+        .mockResolvedValueOnce({ count: 4 });
+      const logError = vi
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      const summary = await service.generateForActivePlans(NOW);
+
+      expect(summary).toEqual({ plans: 3, sessionsCreated: 8, failedPlans: 1 });
+      expect(logError).toHaveBeenCalledWith(
+        'Session generation failed for plan plan-2',
+        expect.any(String),
+      );
+      logError.mockRestore();
+    });
+
+    it('does nothing when there are no plans', async () => {
+      prismaMock.classPlan.findMany.mockResolvedValue([]);
+
+      expect(await service.generateForActivePlans(NOW)).toEqual({
+        plans: 0,
+        sessionsCreated: 0,
+        failedPlans: 0,
+      });
       expect(prismaMock.classSession.createMany).not.toHaveBeenCalled();
     });
   });

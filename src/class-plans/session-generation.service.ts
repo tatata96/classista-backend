@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
-import { ClassPlanStatus, RecurrenceType } from '../generated/prisma/enums.js';
+import {
+  ClassPlanStatus,
+  PartnerStatus,
+  RecurrenceType,
+} from '../generated/prisma/enums.js';
 import { PrismaService } from '../lib/database/prisma.service.js';
 import {
   addDaysToLocalDate,
@@ -21,6 +25,14 @@ export type PlanForGeneration = Prisma.ClassPlanGetPayload<{
   include: { venue: { select: { timezone: true } } };
 }>;
 
+export interface GenerationSummary {
+  plans: number;
+  sessionsCreated: number;
+  failedPlans: number;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 interface GenerationOptions {
   db?: Prisma.TransactionClient;
   now?: Date;
@@ -28,7 +40,54 @@ interface GenerationOptions {
 
 @Injectable()
 export class SessionGenerationService {
+  private readonly logger = new Logger(SessionGenerationService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  // What the daily job and the startup catch-up run: extends the window of
+  // every active recurring plan. One-time plans are skipped because they
+  // already got their only session when they were created. Each plan is
+  // handled on its own, so one failing plan is logged and counted but never
+  // stops the others. Running it twice in a row creates nothing new.
+  async generateForActivePlans(
+    now: Date = new Date(),
+  ): Promise<GenerationSummary> {
+    const plans = await this.prisma.classPlan.findMany({
+      where: {
+        status: ClassPlanStatus.ACTIVE,
+        recurrenceType: RecurrenceType.RECURRING,
+        // End dates are inclusive, so a plan ending today still counts. The
+        // day of slack keeps plans whose venue date is ahead of UTC; the exact
+        // cut-off is applied per plan by generateForPlan.
+        OR: [
+          { endDate: null },
+          { endDate: { gte: new Date(now.getTime() - DAY_MS) } },
+        ],
+        classType: { partner: { status: PartnerStatus.ACTIVE } },
+      },
+      include: { venue: { select: { timezone: true } } },
+    });
+
+    const summary: GenerationSummary = {
+      plans: plans.length,
+      sessionsCreated: 0,
+      failedPlans: 0,
+    };
+
+    for (const plan of plans) {
+      try {
+        summary.sessionsCreated += await this.generateForPlan(plan, { now });
+      } catch (error) {
+        summary.failedPlans += 1;
+        this.logger.error(
+          `Session generation failed for plan ${plan.id}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
+    return summary;
+  }
 
   // Creates the sessions a plan is missing and returns how many it created.
   // `db` is the Prisma client to write with. Creating a plan passes its

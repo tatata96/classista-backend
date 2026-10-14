@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { PrismaModule } from '../lib/database/prisma.module.js';
 import { ClassPlansController } from './class-plans.controller.js';
 import { ClassPlansService } from './class-plans.service.js';
+import { SessionGenerationScheduler } from './session-generation.scheduler.js';
 import { SessionGenerationService } from './session-generation.service.js';
 
 @Module({
@@ -10,6 +11,10 @@ import { SessionGenerationService } from './session-generation.service.js';
   // PrismaModule: needed by PartnerAccessGuard and both services.
   imports: [AuthModule, PrismaModule],
   controllers: [ClassPlansController],
-  providers: [ClassPlansService, SessionGenerationService],
+  providers: [
+    ClassPlansService,
+    SessionGenerationService,
+    SessionGenerationScheduler,
+  ],
 })
 export class ClassPlansModule {}
