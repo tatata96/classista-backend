@@ -39,8 +39,10 @@ export class ClassPlansService {
   ): Promise<ClassPlanResponseDto> {
     const classType = await this.getActiveClassType(partnerId, dto.classTypeId);
     const venue = await this.getActiveVenue(partnerId, dto.venueId);
-    if (dto.instructorId !== undefined) {
-      await this.assertActiveInstructor(partnerId, dto.instructorId);
+    // Omitted or null both mean "no instructor": nothing to look up.
+    const instructorId = dto.instructorId ?? null;
+    if (instructorId !== null) {
+      await this.assertActiveInstructor(partnerId, instructorId);
     }
 
     // A one-time class has a single exact start, so it can be checked against
@@ -66,7 +68,7 @@ export class ClassPlansService {
         data: {
           classTypeId: dto.classTypeId,
           venueId: dto.venueId,
-          instructorId: dto.instructorId,
+          instructorId,
           // Copied now, so renaming the Class Type later does not rename the plan.
           title: classType.name,
           description: dto.description,

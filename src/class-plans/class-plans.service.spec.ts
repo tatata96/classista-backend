@@ -74,12 +74,10 @@ describe('ClassPlansService', () => {
     prismaMock.classType.findFirst
       .mockReset()
       .mockResolvedValue({ name: 'Puppy Yoga', isActive: true });
-    prismaMock.venue.findFirst
-      .mockReset()
-      .mockResolvedValue({
-        status: VenueStatus.ACTIVE,
-        timezone: 'Europe/Istanbul',
-      });
+    prismaMock.venue.findFirst.mockReset().mockResolvedValue({
+      status: VenueStatus.ACTIVE,
+      timezone: 'Europe/Istanbul',
+    });
     prismaMock.instructor.findFirst
       .mockReset()
       .mockResolvedValue({ isActive: true });
@@ -210,10 +208,29 @@ describe('ClassPlansService', () => {
         );
       });
 
-      it('skips the instructor lookup when none is given', async () => {
-        await service.create(PARTNER_ID, RECURRING_DTO);
+      // Regression: a null instructorId used to reach the lookup.
+      it.each([
+        ['omitted', undefined],
+        ['null', null],
+      ])(
+        'skips the instructor lookup and stores null when instructorId is %s',
+        async (_label, instructorId) => {
+          await service.create(PARTNER_ID, { ...RECURRING_DTO, instructorId });
 
-        expect(prismaMock.instructor.findFirst).not.toHaveBeenCalled();
+          expect(prismaMock.instructor.findFirst).not.toHaveBeenCalled();
+          const [{ data }] = txMock.classPlan.create.mock.calls[0];
+          expect(data.instructorId).toBeNull();
+        },
+      );
+
+      it('stores the instructor when a valid one is given', async () => {
+        await service.create(PARTNER_ID, {
+          ...RECURRING_DTO,
+          instructorId: INSTRUCTOR_ID,
+        });
+
+        const [{ data }] = txMock.classPlan.create.mock.calls[0];
+        expect(data.instructorId).toBe(INSTRUCTOR_ID);
       });
 
       it('rejects an unknown or other partner Class Type', async () => {

@@ -36,11 +36,14 @@ export class CreateClassPlanDto {
   venueId: string;
 
   @ApiPropertyOptional({
-    description: 'An active instructor owned by the partner',
+    nullable: true,
+    description:
+      'An active instructor owned by the partner. Omit or send null for no instructor.',
   })
+  // IsOptional skips the UUID check for both undefined and null.
   @IsOptional()
   @IsUUID()
-  instructorId?: string;
+  instructorId?: string | null;
 
   @ApiPropertyOptional({ maxLength: 2000, nullable: true })
   // Trim first, then store blank text as null, like Class Type descriptions.

@@ -49,6 +49,39 @@ describe('CreateClassPlanDto', () => {
     ).toEqual([]);
   });
 
+  describe('instructorId', () => {
+    it('accepts it omitted, null, or a UUID', async () => {
+      expect(await failedProperties(ONE_TIME)).toEqual([]);
+      expect(
+        await failedProperties({ ...ONE_TIME, instructorId: null }),
+      ).toEqual([]);
+      expect(
+        await failedProperties({ ...ONE_TIME, instructorId: UUID }),
+      ).toEqual([]);
+    });
+
+    it.each(['not-a-uuid', '', 123])('rejects %j', async (instructorId) => {
+      expect(await failedProperties({ ...ONE_TIME, instructorId })).toContain(
+        'instructorId',
+      );
+    });
+
+    it('keeps null as null through the global validation pipe', async () => {
+      const pipe = new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      });
+
+      const dto = (await pipe.transform(
+        { ...ONE_TIME, instructorId: null },
+        { type: 'body', metatype: CreateClassPlanDto },
+      )) as CreateClassPlanDto;
+
+      expect(dto.instructorId).toBeNull();
+    });
+  });
+
   it('turns a blank description into null', async () => {
     const dto = plainToInstance(CreateClassPlanDto, {
       ...ONE_TIME,
