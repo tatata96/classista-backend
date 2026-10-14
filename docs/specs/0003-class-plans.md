@@ -1,7 +1,7 @@
 # 0003. Class Plans
 
 **Date**: 2026-10-14
-**Status**: Accepted (first PR in progress: plan creation, listing, and session generation)
+**Status**: Accepted (first PR implemented: plan creation, listing, and session generation; the rest is deferred, see Implementation status)
 
 ## Summary
 
@@ -9,11 +9,28 @@ A Class Plan is a partner's schedule for one Class Type at one Venue: either a s
 
 **Out of scope** (separate specs): customer notifications, credits, refunds, payouts, the 12-hour late-cancellation policy, no-show handling, and the "one spot, one payment" rule. Where a rule below touches a booking outcome (cancelling a class, editing a plan), only the schedule behavior is specified here, never the money side.
 
-## Implementation scope
-
-The first PR builds only **plan creation and session generation** (creation rules, capacity, the rolling window, idempotent generation, the daily job, and the venue and Class Type checks). Plan creation, listing, and session generation are in scope. Editing, pausing, closing, cancellation, and single-session capacity edits are specified below but **deferred to later PRs**. Booking endpoints and the booking-window check are also later. Schema fields needed only by deferred features (override flags, cancellation fields) are added in the PR that builds them.
-
 Related: [0002 Partner Class Types](0002-partner-class-types.md).
+
+## Implementation status
+
+**Implemented (first PR, branch `feat/class-plans`)**
+
+- Schema and migration: `totalCapacity` and `classistaCapacity` on plans and sessions, `durationMinutes` replacing `endTime`. The migration refuses to run if either table has rows, instead of guessing.
+- Venues: clients no longer send a timezone; the backend sets `Europe/Istanbul`, and the field is stored but not exposed in responses.
+- `POST /partner/class-plans`: creation rules, partner scoping, active Class Type / venue / instructor checks (this finishes the follow-up from spec 0002), one-time "must start in the future", title copied from the Class Type, and plan plus first sessions saved in one transaction.
+- `GET /partner/class-plans`: the partner's plans, dates as `YYYY-MM-DD` and times as `HH:mm`.
+- Session generation: one session for a one-time plan; the rolling 30-day window for recurring plans; idempotent; paused plans generate nothing.
+- Daily job (03:00 Istanbul, `@nestjs/schedule`) and a startup catch-up, each plan isolated so one failure does not stop the others.
+
+**Deferred to later PRs** (specified below, not built)
+
+- Editing a plan (24-hour cutoff, in-place updates, restore, capacity overrides) and single-session capacity edits.
+- Pausing, reactivating, and closing a recurring plan.
+- Cancelling a session or a one-time class, and the cancellation fields (`cancelledById`, `cancelledAt`, `cancellationSource`).
+- Booking endpoints and the 30-day booking-window check.
+- Customer notifications, credits, refunds, and payouts (separate specs).
+
+Schema fields needed only by deferred features (override flags, cancellation fields) are added in the PR that builds them.
 
 ## Creating a plan
 
@@ -67,7 +84,7 @@ A recurring plan defines a schedule. It does not create every session up to its 
 - Plan creation and its first session generation run in **one database transaction**: if generation fails, the plan is not created. The daily job generates in its own per-plan transactions.
 - **Paused plans do not generate sessions.**
 - Customers can book only sessions starting within the same window (after now, no later than 30 × 24 hours from now), and **the backend enforces it**.
-- The daily job uses `@nestjs/schedule`, an approved new dependency (added at implementation time, not yet installed).
+- The daily job uses `@nestjs/schedule`, an approved new dependency (installed).
 - Verification of transaction rollback and duplicate prevention must run against a real test database; mocked Prisma cannot prove them.
 - **Generation is idempotent.** It checks which sessions already exist and creates only the missing ones. The existing `@@unique([classPlanId, startAt])` on Class Session is the safety net, so a repeated or concurrent run cannot create duplicates.
 - **Why a session was cancelled decides whether generation may bring it back.** The unique key only prevents duplicates; it does not decide this behavior.
@@ -148,3 +165,45 @@ A partner may edit the capacity of a single session directly. Session time still
 ## Data model impact
 
 `ClassPlan` and `ClassSession` replace the single `capacity` column with `totalCapacity` and `classistaCapacity`. `ClassPlan` replaces `endTime` with `durationMinutes`. The migration must handle existing rows explicitly: it never invents total capacities and never resets the database. If a table has rows it cannot migrate reliably, the migration fails with a clear message instead of guessing (when written, all three tables were empty). Later PRs add: per-field capacity override flags (total and Classista), and `cancelledById`, `cancelledAt`, and `cancellationSource` beside the existing free-text `cancelledReason` (see Session generation). `cancelledById` references `User`.
+
+## Verification
+
+Run on 2026-10-14.
+
+- **Unit tests:** 335 tests in 30 files pass (`npm test`), using mocked Prisma.
+- **Integration tests:** 10 tests pass against the local Docker test database (`npm run test:integration`), and passed again on a second run. They prove what mocks cannot:
+  - the plan and its sessions are rolled back when generation fails after writing them;
+  - generation run twice, five times at once, or after the window moves creates no duplicate sessions;
+  - the database itself refuses a duplicate `(classPlanId, startAt)` (`P2002`);
+  - the daily job extends only active recurring plans of active partners, includes a plan ending today, and creates nothing new on a second run.
+- **Tests that can fail:** removing `skipDuplicates` made 4 of those tests fail; making generation ignore the transaction client made 3 fail. Both were restored.
+- **Test database safety:** the tests read `TEST_DATABASE_URL` only and refuse anything but `localhost`/`127.0.0.1`, port `54329`, database `classista_test`. The guard has its own unit tests.
+- **Lint:** `oxlint src/ test/` reports no problems.
+- **Build and boot:** `nest build` succeeds. The booted app mapped both class-plan routes, returned 401 for `GET` and `POST` without a token, and the startup catch-up ran against the development database (0 plans at the time, so 0 sessions created).
+- **Migration:** applied to the test database. `migrate deploy` was run against the development database by the project owner.
+
+**Type check does NOT pass cleanly.** `npx tsc --noEmit` reports one error, in a file this work did not touch:
+
+```text
+test/app.e2e-spec.ts(4,21): error TS2307: Cannot find module 'supertest/types'
+or its corresponding type declarations.
+```
+
+It comes from the original NestJS scaffold (commit `94d2c3e`). `supertest` 7.2.2 is installed but has no `supertest/types` entry, so the import fails. It does not affect `nest build`, the unit tests, or the integration tests. It is not fixed here.
+
+**Not verified**
+
+- No HTTP request with a real partner token was made, so the full create-and-list flow through authentication has not been exercised against a running app.
+- The `app.e2e-spec.ts` end-to-end tests were not run.
+- The 03:00 cron schedule was not observed firing; only the startup run was seen.
+- The migration's refusal when rows exist was reasoned about, not executed.
+- Booting the whole app (including `test/app.e2e-spec.ts`) triggers the startup catch-up against whichever database is configured.
+
+## Follow-up
+
+- [ ] Fix the `supertest/types` import in `test/app.e2e-spec.ts` so `tsc --noEmit` is clean.
+- [ ] Add HTTP end-to-end tests for `/partner/class-plans` with a real partner token.
+- [ ] Optional helper: a `docker-compose` file or npm script that starts the test database in one command (approved, not required for this PR).
+- [ ] Build the deferred features above, in this order of dependency: cancellation, pause and close, editing.
+- [ ] Decide whether to reject a recurring plan whose end date is already past (today it is saved with no sessions), and whether a recurring plan may start in the past (today it is accepted).
+- [ ] The job loads all matching plans in one query; batch it if plan counts grow.

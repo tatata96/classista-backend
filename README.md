@@ -71,6 +71,7 @@ npm run test         # Run unit tests
 npm run test:watch   # Run tests in watch mode
 npm run test:cov     # Run tests with coverage
 npm run test:e2e     # Run end-to-end tests
+npm run test:integration  # Run tests against the local test database (see Testing)
 ```
 
 ## Current API
@@ -99,8 +100,34 @@ POST  /partner/class-types/:id/archive           # Archive; idempotent, keeps pl
 
 Design decisions for Class Types are recorded in
 [docs/specs/0002-partner-class-types.md](docs/specs/0002-partner-class-types.md).
-Creating a Class Plan must reject archived Class Types, but that rule is **not
-implemented yet** because Class Plans do not exist yet.
+
+```http
+# Partner Class Plans. Same auth rules as Class Types.
+GET   /partner/class-plans    # The partner's plans (dates as YYYY-MM-DD, times as HH:mm)
+POST  /partner/class-plans    # Create a plan and generate its sessions in one transaction
+```
+
+Plans generate their sessions automatically. Editing, pausing, and cancelling
+plans are not built yet. Details: [docs/specs/0003-class-plans.md](docs/specs/0003-class-plans.md).
+
+## Testing
+
+`npm test` runs the unit tests (mocked database, no setup).
+
+`npm run test:integration` runs tests against a throwaway Postgres in Docker,
+never the development database:
+
+```bash
+docker run -d --name classista-test-db \
+  -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=classista_test \
+  -p 127.0.0.1:54329:5432 postgres:17.4
+
+TEST_DATABASE_URL=postgresql://test:test@127.0.0.1:54329/classista_test \
+  npm run test:integration
+```
+
+It only runs against `localhost:54329/classista_test` and never reads
+`DATABASE_URL`. Known issues are listed in the spec above.
 
 ## Project Structure
 
@@ -112,18 +139,20 @@ src/
   auth/                   Supabase token verification, the auth guard, GET /auth/me
   categories/             Public category browsing
   class-types/            Partner Class Type management (list, create, edit, archive)
+  class-plans/            Partner Class Plans: create, list, session generation, daily job
   lib/database/           PrismaService, the app's database connection
   config/                 Environment variable validation
   common/filters/         Global exception handling
 test/
   app.e2e-spec.ts         End-to-end test suite
+  integration/            Real-database tests and the test database safety guard
 ```
 
 ## Roadmap
 
 - Partner and studio authorization (scoping dashboard access to the authenticated partner)
 - Partner and venue management
-- Class plans and session generation (must only accept active Class Types)
+- Class plan editing, pausing, closing, and cancellation (creation and session generation are done)
 - Booking and credit management
 - SMTP provider for Supabase's transactional email (confirmation, password reset), before real user onboarding
 

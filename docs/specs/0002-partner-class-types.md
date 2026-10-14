@@ -1,7 +1,7 @@
 # 0002. Partner Class Type management
 
 **Date**: 2026-10-13
-**Status**: Accepted (backend endpoints built; Class Plan integration not implemented yet)
+**Status**: Accepted (backend endpoints built; Class Plan creation now rejects archived Class Types, see spec 0003)
 
 ## Summary
 
@@ -32,7 +32,7 @@ All `/partner/class-types` routes use `SupabaseAuthGuard` then `PartnerAccessGua
 
 ## Not implemented yet
 
-- **Class Plan creation must reject archived Class Types.** Only active Class Types may be selectable for new Class Plans. Class Plan creation does not exist yet, so this rule is **not enforced anywhere today**. It must be added, with a test, when Class Plan creation is built.
+- _Done in [0003](0003-class-plans.md):_ Class Plan creation rejects archived Class Types (400, "Class Type is archived"), with a unit test in `class-plans.service.spec.ts`.
 
 ## Verification
 
@@ -42,7 +42,7 @@ All `/partner/class-types` routes use `SupabaseAuthGuard` then `PartnerAccessGua
 
 ## Follow-up
 
-- [ ] Enforce "only active Class Types are selectable" when Class Plan creation is built.
+- [x] Enforce "only active Class Types are selectable" when Class Plan creation is built.
 - [ ] Add end-to-end tests (HTTP plus database) for the class-type routes.
 - [ ] Image upload and editing for Class Types.
 - [ ] Category tree is assumed to be two levels; revisit `GET /categories` if deeper nesting is ever seeded.
