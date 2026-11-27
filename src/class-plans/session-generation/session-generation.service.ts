@@ -6,6 +6,7 @@ import {
   RecurrenceType,
 } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../../lib/database/prisma.service.js';
+import { BOOKING_WINDOW_MS } from '../booking-window.js';
 import {
   addDaysToLocalDate,
   addMinutes,
@@ -15,9 +16,6 @@ import {
   instantToLocalDate,
   zonedDateTimeToInstant,
 } from '../zoned-time.js';
-
-// Recurring plans only get sessions starting within the next 30 x 24 hours.
-const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 // A plan together with its venue's timezone, which is what turns the plan's
 // wall-clock date and time into the exact instant of a session.
@@ -144,7 +142,7 @@ export class SessionGenerationService {
   // (now, now + 30 days]. The window is measured in instants; the venue's
   // timezone only decides which local dates to walk through.
   private getRecurringStartTimes(plan: PlanForGeneration, now: Date): Date[] {
-    const windowEnd = new Date(now.getTime() + WINDOW_MS);
+    const windowEnd = new Date(now.getTime() + BOOKING_WINDOW_MS);
     const timeZone = plan.venue.timezone;
 
     // 'YYYY-MM-DD' strings sort chronologically, so max/min are plain comparisons.
